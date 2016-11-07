@@ -1,0 +1,42 @@
+%%%%%%%%%%-----PACKAGES
+% Tables
+\usepackage{booktabs}
+\newcommand{\ra}[1]{\renewcommand{\arraystretch}{#1}}
+
+\usepackage{todonotes}
+
+% this package can be used to improve spacing between words.
+\usepackage{microtype}
+\usepackage[utf8]{inputenc}
+
+\usepackage[block=ragged]{biblatex} % ragged for nice formatted links in bibliography
+\bibliography{bibliography}
+
+\usepackage{hyperref}
+\usepackage{cleveref}
+\hypersetup{allcolors = {black}, colorlinks}
+
+%%%%%%%%%%-----Code listening examples
+\usepackage[outputdir=.texpadtmp, section]{minted}
+
+% \begin{javascriptcode}...
+\newminted{javascript}{tabsize=2, linenos=true, fontsize=\scriptsize, xleftmargin=3.5ex}
+
+% \javascript/code/
+\newmintinline{javascript}{}
+
+% \javascriptfile{name}
+\newmintedfile{javascript}{tabsize=2, linenos=true, fontsize=\scriptsize, xleftmargin=3.5ex, mathescape, breaklines=true}
+
+%%% DOCUMENT Properties
+\title{Parallelize JavaScript-Computations with Ease}
+
+\author{Micha Reiser}
+\author{\affiliation{
+		University of Applied Sciences Rapperswil\\
+    	Supervised by Prof. Dr. Luc Bläser\\
+    	AT 2016
+}
+}
+
+\hyphenation{ECMAScript}

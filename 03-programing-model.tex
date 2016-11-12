@@ -1,1 +1,20 @@
 \section{Programing Model}\label{sec:programing-model}
+
+\begin{figure}
+	\begin{javascriptcode}
+function computeMandelbrotLine(y, options) {
+	const arrazSie = options.imageWidth * 4;
+	const line = new Uint8ClampedArray(arraySize);
+	// compute...
+	return line;
+}
+
+parallel
+	.range(options.imageHeight)
+	.inEnvironment(options)
+	.map(computeMandelbrotLine)
+	.then(result => console.log(result);
+	\end{javascriptcode}
+	
+	\caption{Mandelbrot Implementation in parallel.es}
+\end{figure}

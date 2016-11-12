@@ -38,11 +38,11 @@
 % ---------------------------------------------------------------------------
 
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{asme2ej}[2001/2/14 v2.0 Standard LaTeX document class]
+\ProvidesClass{asme2e}[2001/2/14 v2.0 Standard LaTeX document class]
 
 \RequirePackage{ifthen}
 \RequirePackage{times}      % Loads the Times-Roman Fonts
-\RequirePackage{newtxmath}    % Loads the Times-Roman Math Fonts, changed from mathptmx
+\RequirePackage{mathptm}    % Loads the Times-Roman Math Fonts
 \RequirePackage{ifpdf}      % Needed to pick between latex and pdflatex
 
 \newboolean{@titlepage}
@@ -332,8 +332,8 @@
 %                 Page Layout
 % -----------------------------------------------------------
 
-\setlength{\paperheight}{297mm}
-\setlength{\paperwidth}{210mm}
+\setlength{\paperheight}{11in}
+\setlength{\paperwidth}{8.5in}
 %\setlength{\oddsidemargin}{48pt}
 %\setlength{\evensidemargin}{48pt}
 \setlength{\oddsidemargin}{0.925in}

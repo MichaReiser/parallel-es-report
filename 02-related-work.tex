@@ -1,5 +1,5 @@
 \section{Related Work}\label{sec:related-work}
-There exists various open source projects addressing similar or equal goals. This section describes the differences of the presented work to the already existing ones. The differences of the APIs are explained using the computation of a Mandelbrot where the parallelization is performed on a per line basis. The synchronous implementation is shown in \cref{fig:mandelbrot-sync}. The actual implementation of the per line computation is omitted for brevity as it is almost identical for all libraries. The source code for all examples is available in a designated GitHub project~\cite{Reiser2016}.\todo{Its a little bit a mixture between evaluation and presenting the related work?}
+There exists various open source projects addressing similar or equal goals. This section describes the differences of the presented work to the already existing ones. The differences of the apis are explained using the computation of a Mandelbrot where the parallelization is performed on a per line basis. The synchronous implementation is shown in \cref{fig:mandelbrot-sync}. The actual implementation of the per line computation is omitted for brevity as it is almost identical for all libraries. The source code for all examples is available in a designated GitHub project~\cite{Reiser2016}.\todo{Its a little bit a mixture between evaluation and presenting the related work?}
 
 \begin{figure}
 	
@@ -11,11 +11,10 @@ function computeMandelbrotLine(y, options) {
 	return line;
 }
 
-const result = [];
-for (let y = 0; y < options.imageHeight; ++y) {
-	const line = computeMandelbrotLine(y, options);
-	result.push(line);
-}
+const range = _.range(options.imageHeight);
+const result = range.map(
+	y => computeMandelbrotLine(y, options)
+);
 console.log(result);
 \end{javascriptcode}
 \caption{Synchronous Mandelbrot Implementation}
@@ -23,10 +22,10 @@ console.log(result);
 \end{figure}
 
 \subsection{Parallel.js}
-Parallel.js~\cite{SavitzkyMayr2016} has been started in 2013 and is the oldest library of the evaluated ones. The main goal is to provide a simple API for multiprocessing in JavaScript. It provides an uniform API for the browser and NodeJS --- Web Workers are used in the Browser, child process in NodeJS. Parallel.js provides a low level API for running a function in a background thread and a reactive API providing an automatic task scheduling for the provided data. 
+Parallel.js~\cite{SavitzkyMayr2016} has been initiated in 2013 and is the oldest of the evaluated libraries. The main goal is to provide a simple api for multiprocessing in JavaScript. It provides an uniform api for the browser and NodeJS --- Web Workers are used in the Browser, child process~\cite{childProcess} on NodeJS. Parallel.js provides a low level api for running a function in a background thread and a reactive api providing an automatic task scheduling for the provided data. 
 
 
-The implementation of the Mandelbrot example using Parallel.js is shown in \cref{fig:mandelbrot-paralleljs}. The first argument of the \javascriptinline/Parallel/ constructor is the data to process. The second --- optional ---  argument is an options-object affecting the behavior of Parallel.js. The \javascriptinline/env/ property of the options object is exposed as \javascriptinline/global.env/ in the background thread. The use of the \javascriptinline/global/ requires additional care if typed languages are used as the variable is undeclared at this point. It also hinders that the same function can be called form the ui-thread. The \javascriptinline/require/ function allows to expose additional functions inside of the worker code. The function passed into \javascriptinline/map/ is called for every element in the input array.
+The implementation of the Mandelbrot example using Parallel.js is shown in \cref{fig:mandelbrot-paralleljs}. The first argument of the \javascriptinline/Parallel/ constructor is the data to process. The second --- optional ---  argument is an options-object affecting the behavior of Parallel.js. The \javascriptinline/env/ property of the options object is exposed as \javascriptinline/global.env/ in the background thread. The use of the \javascriptinline/global/ requires additional care if typed languages are used as the variable is undeclared at this point. It also hinders that the same function can be called from the ui-thread. The \javascriptinline/require/ function allows to expose additional functions inside of the worker code. The function passed into \javascriptinline/map/ is called for every element in the input array.
 
 \begin{figure}
 	\begin{javascriptcode}
@@ -70,13 +69,12 @@ function computeMandelbrotLine({ y, options}, done) {
 }
 
 const taskPromises = [];
-const pool = new Pool(); // Create pool $\label{code:threadsjs-pool}$
-pool.run(computeMandelbrotLine); // Define worker $\label{code:threadsjs-worker}$
+const pool = new Pool(); |$\label{code:threadsjs-pool}$|
+pool.run(computeMandelbrotLine); |$\label{code:threadsjs-worker}$|
 
 const lines = _.range(options);
 for (const y of lines) {
-	// Send work to background-task $\label{code:threadsjs-messaging}$
-	const taskPromise = pool.send({ y, options}).promise());
+	const taskPromise = pool.send({ y, options}).promise()); |$\label{code:threadsjs-messaging}$|
 	taskPromises.push(taskPromise);
 }
 
@@ -91,14 +89,14 @@ The main difference of Threads.js is that it is messaging based. It therefore fi
 
 
 \subsection{Hamsters.js}
-Hamsters.js~\cite{hamstersjs} is the library with the highest attention measured by the number of GitHub stars. It provides a low level api for running functions in a background thread. The background threads are managed in a global thread pool. In addition various helper functionalities like like array sorting, aggregating or caching are provided. The library has support for Transferable objects and claims to support scheduling threads from a background-thread. The main differences to Hamsters.js is that the proposed worker is thread safe and provides a higher level api that simplifies parallelization. 
+Hamsters.js~\cite{hamstersjs} is the library with the highest attention measured by the number of GitHub stars. It provides a low level api for running functions in a background thread. The background threads are managed in a global thread pool. In addition various helper functionalities like like array sorting, aggregating or caching are provided. The library has support for Transferable objects and claims to support scheduling threads from a background-thread. The main differences to Hamsters.js is that the proposed api is type safe and provides a higher level api that simplifies parallelization. 
 
 The implementation of the Mandelbrot is shown \cref{fig:mandelbrot-hamsterjs}. A background-task is started using \javascriptinline/hamsters.run(...)/ (line \ref{code:hamsterjs-start}). The first argument are the parameters that are passed to the operation to execute that is passed as second argument. The third argument is the callback that is invoked when the operation is complete. The passed parameters are available as the global object \javascriptinline/params/ (line \ref{code:hamstersjs-params}) in the background task. Hamsters.js passes a sub array to each task leaving it to the background-operation to iterate over the sub-array elements. The data returned by the background task need to be written into the \javascriptinline/rtn.data/ (line \ref{code:hamsterjs-result}) array data is also defined globally. This requires additional care if typed languages are used and reduces code sharing between background-task logic and ui-thread logic.
 
 \begin{figure}
 \begin{javascriptcode}
 function computeMandelbrotLine () {
-	const options = params.options; // Access params$\label{code:hamstersjs-params}$
+	const options = params.options; |$\label{code:hamstersjs-params}$|
 	const width = options.imageWidth;
 	const input = params.array;
 
@@ -106,7 +104,7 @@ function computeMandelbrotLine () {
 		const y = input[i];
 		const line = new Uint8ClampedArray(width * 4);
 		// compute...
-		rtn.data.push(line); // Add data to result $\label{code:hamsterjs-result}$
+		rtn.data.push(line); |$\label{code:hamsterjs-result}$|
 	}
 }
 
@@ -116,12 +114,12 @@ const params = {
 	options
 };
 
-hamsters.run( // start operation $\label{code:hamsterjs-start}$
-	params,  // arguments for task
-	computeMandelbrotLine, // operation
-	result => console.log(result), // callback
-	hamsters.maxThreads, // number of threads
-	true); // aggregate results into one array
+hamsters.run( |$\label{code:hamsterjs-start}$|
+	params,  
+	computeMandelbrotLine, 
+	result => console.log(result), 
+	hamsters.maxThreads, 
+	true);
 \end{javascriptcode}
 \caption{Mandelbrot Implementation using Hamsters.js}
 \label{fig:mandelbrot-hamsterjs}

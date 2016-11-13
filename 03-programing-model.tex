@@ -1,20 +1,48 @@
 \section{Programing Model}\label{sec:programing-model}
+The programing model of parallel.es motivates the programer to perform parallel computations asynchrony on background-threads. 
+
+\subsection{Background Task}
+A \textit{background task} --- further referred to as task --- represents a single asynchronous operation executed on a designated thread and is implemented by a JavaScript function. Some inherent restrictions from the gap to the Web Worker programing model apply to the function that are followingy discussed.
+
+The function may only refer to data that is explicitly passed to it by function arguments. Any references to variables from its closure --- including other functions or imports --- are prohibited. Data passed to a task is serialized using the structured clone algorithm~\cite[Section 2.9.4]{WHATWG2016}. This implies that passed object are passed by value and therefore changes made in a task are not reflected in the ui-thread. The structured clone also restricts the objects that can be passed as DOM elements and functions are not cloneable. 
+
+The function context of a task function (\javascriptinline/this/) is always set to \javascriptinline/undefined/. This also applies to \texttt{ArrowFunctionExpression}s that are semantically treaded equally to \texttt{FunctionExpression}s --- and therefore loose their additional semantics -- if used as a task implementation.
+
+The global context of a task differs from the one in the ui-thread. The browser api exposed in Web Workers is far more limited, e.g. the DOM cannot be accessed from a worker. However, this should not be a restriction as tasks are preliminary used to perform computing intensive operations. 
+
+A task differs from a normal function invocation as the computation is performed on a designated thread instead of in the main/ui thread where the computation blocks the event-loop resulting in delayed ui-updates and reduced frame rates. Tasks may be executed concurrently if the hardware has more than one logical processor. By design all tasks are isolated from each other as each tasks uses its own local variables.
+
+\subsection{Example}
+An implementation of the Mandelbrot computation using paralle.es is shown in \cref{code:mandelbrot-parallel.es}. The implementation is very similar to the synchronous implementation from \cref{fig:mandelbrot-sync}. The task is defined from line \ref{code:parallel-es-definition-start} to \ref{code:parallel-es-definition-end} using the descriptive api. The \javascriptinline/range/ method defines the input as a range from 0 up to the image height. The object passed to \javascriptinline/inEnvironment/ is available to the function in the background task through an additional function parameter. The operation to performed in this case is to \javascriptinline/map/ each element from the input range using the passed \javascriptinline/computeMandelbrotLine/ function. The computation is started using the \javascriptinline/then/ operation (line \ref{code:parallel-es-start}) that registers a callback to invoke in case the computation succeeds --- an optional error callback can be defined as well. The then callback is executed in the ui-thread. The \javascriptinline/computeMandelbrotLine/ function (line \ref{code:parallel-es-operation}) --- that is executed on the background-thread --- has access to the current array element and as well to the \javascriptinline/environment/ object that was passed in the \javascriptinline/inEnvironment/ call. No additional build step is required.
+
 
 \begin{figure}
 	\begin{javascriptcode}
-function computeMandelbrotLine(y, options) {
-	const arrazSie = options.imageWidth * 4;
+function computeMandelbrotLine(y, environment) { |$\label{code:parallel-es-operation}$|
+	const arrazSize = environment.imageWidth * 4;
 	const line = new Uint8ClampedArray(arraySize);
 	// compute...
 	return line;
 }
 
-parallel
+parallel      |$\label{code:parallel-es-definition-start}$|
 	.range(options.imageHeight)
 	.inEnvironment(options)
-	.map(computeMandelbrotLine)
-	.then(result => console.log(result);
+	.map(computeMandelbrotLine) |$\label{code:parallel-es-definition-end}$|
+	.then(result => console.log(result); |$\label{code:parallel-es-start}$|
 	\end{javascriptcode}
 	
 	\caption{Mandelbrot Implementation in parallel.es}
+	\label{code:mandelbrot-parallel.es}
 \end{figure}
+
+%\subsection{Task Implementation}
+%A task is implemented by a JavaScript function. The 
+%
+%% The following is how it is implemented but not what the programing model defines
+%
+%This is inherited from the Web Worker programing model where each Worker uses its own memory and data exchange requires messaging\footnote{This might change with the SharedMemory~\cite{Ecma2016} standard that is currently a draft in stage 2.} resulting in various restrictions applying to the functions implementing a task. Some of these restrictions can be hidden by using the proposed code transpilation step described in TODO\todo{add ref}.
+%
+%It is prohibited for a task function to access any variables --- including functions and imports --- from its closure. This is rooted in the fact that the variables from the closure resist in the memory of the ui-thread and not in the thread executing the task. However, required data can be passed as function arguments to the task in question. Structured clone~\cite[Section 2.9.4]{WHATWG2016} is used to transfer data between threads.
+
+

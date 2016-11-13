@@ -20,13 +20,13 @@
 \usepackage[outputdir=.texpadtmp, section]{minted}
 
 % \begin{javascriptcode}...
-\newminted{javascript}{tabsize=2, linenos=true, fontsize=\scriptsize, xleftmargin=3.5ex, mathescape}
+\newminted{javascript}{tabsize=2, linenos=true, fontsize=\scriptsize, xleftmargin=3.5ex, escapeinside=||,mathescape}
 
 % \javascript/code/
 \newmintinline{javascript}{}
 
 % \javascriptfile{name}
-\newmintedfile{javascript}{tabsize=2, linenos=true, fontsize=\scriptsize, xleftmargin=3.5ex, mathescape, breaklines=true}
+\newmintedfile{javascript}{tabsize=2, linenos=true, fontsize=\scriptsize, xleftmargin=3.5ex, mathescape,  breaklines=true}
 
 %%% DOCUMENT Properties
 \title{Parallelize JavaScript-Computations with Ease}

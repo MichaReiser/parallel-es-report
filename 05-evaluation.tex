@@ -1,1 +1,128 @@
 \section{Evaluation}\label{sec:evaluation}
+The evaluation focuses on computation intensive tasks or tasks over a large set of data that are expected to profit from parallelization. The evaluation compares the presented work with the solutions introduced in \cref{sec:related-work} in respect to the performance results and simplicity of application. 
+
+\subsection{Performance Comparison}
+The performance of the presented and related work is measured and compared using the following problems:
+
+\begin{enumerate}
+	\item Mandelbrot: Computation of a Mandelbrot for a given image size. Requires a relatively large amount compared to the computation time needed.
+	\item Knight Tour: Computation of the number of open tours from a given start field. Very compute intensive task. 
+	\item Montecarlo Simulation: Simulating the outcome of multiple investments over a time range of 15 years and determining of the probability that the needed amount for a customer target is available when needed. Representation of a real world example.
+\end{enumerate}
+
+
+\subsection{Usability}
+The usability is evaluated by comparing the implementations for a Mandelbrot computation where the parallelization is performed on a per line basis. The synchronous implementation is shown in \cref{fig:mandelbrot-sync}. The actual implementation of the per line computation is omitted for brevity as it is almost identical for all libraries. The preliminary focus is on type safety, readability, compactness and build system integration. However, some of the result might be subjective and represent the opinion of the author. The source code for all examples is available in a designated GitHub project~\cite{Reiser2016}. 
+
+\begin{figure}
+	
+	\begin{javascriptcode}
+function computeMandelbrotLine(y, options) {
+	const arraySize = options.imageWidth * 4;
+	const line = new Uint8ClampedArray(arraySize);
+	// compute...
+	return line;
+}
+
+const range = _.range(options.imageHeight);
+const result = range.map(
+	y => computeMandelbrotLine(y, options)
+);
+console.log(result);
+\end{javascriptcode}
+\caption{Synchronous Mandelbrot Implementation}
+\label{fig:mandelbrot-sync}
+\end{figure}
+
+\subsubsection{Parallel.js}
+The implementation of the Mandelbrot example using Parallel.js is shown in \cref{fig:mandelbrot-paralleljs}. The first argument of the \javascriptinline/Parallel/ constructor is the data to process. The second --- optional ---  argument is an options-object affecting the behavior of Parallel.js. The \javascriptinline/env/ property of the options object is exposed as \javascriptinline/global.env/ in the background thread. The use of the \javascriptinline/global/ requires additional care if typed languages are used as the variable is undeclared at this point. It also hinders that the same function can be called from the ui-thread. The \javascriptinline/require/ function allows to expose additional functions inside of the worker code. The function passed into \javascriptinline/map/ is called for every element in the input array.
+
+\begin{figure}
+	\begin{javascriptcode}
+function computeMandelbrotLine(y, options) {
+	const arraySize = options.imageWidth * 4;
+	const line = new Uint8ClampedArray(arraySize);
+	// compute...
+	return line;
+}
+
+const lines = _.range(options.imageHeight);
+const parallelOptions = { env: options }; 
+
+new Parallel(lines, parallelOptions)
+	.require(computeMandelbrotLine)
+	.map(
+		line => computeMandelbrotLine(line, global.env)
+	)
+	.then(result => console.log(result));
+\end{javascriptcode}
+
+\caption{Mandelbrot Implementation using Parallel.js}
+\label{fig:mandelbrot-paralleljs}
+\end{figure}
+
+\subsubsection{Threads.js}
+ The Mandelbrot implementation using threads.js is shown in \cref{fig:mandelbrot-threadsjs}. By default threads.js does not use thread pools. A thread pool needs to be created manually if desired (line \ref{code:threadsjs-pool}). The function to execute in the background worker is defined using the \javascriptinline/run/ method on the pool (line \ref{code:threadsjs-worker}). A new task is created for the thread pool whenever \javascriptinline/send/ is invoked on the pool returning a promise that resolves when the computation is complete. The final result can be retrieved by waiting until all promises of the tasks are resolved.
+
+
+\begin{figure}
+	\begin{javascriptcode}
+function computeMandelbrotLine({ y, options}, done) {
+	const arraySize = options.imageWidth * 4;
+    const line = new Uint8ClampedArray(arraySize);
+    // compute...
+    done.transfer(line, [line.buffer]);
+}
+
+const taskPromises = [];
+const pool = new Pool(); |$\label{code:threadsjs-pool}$|
+pool.run(computeMandelbrotLine); |$\label{code:threadsjs-worker}$|
+
+const lines = _.range(options);
+for (const y of lines) {
+	const taskPromise = pool.send({ y, options}).promise()); |$\label{code:threadsjs-messaging}$|
+	taskPromises.push(taskPromise);
+}
+
+Promise.all(taskPromises)
+	.then(result => console.log(result));	
+\end{javascriptcode}
+\caption{Mandelbrot Implementation using threads.js}
+\label{fig:mandelbrot-threadsjs}
+\end{figure}
+
+\subsubsection{Hamsters.js}
+The implementation of the Mandelbrot is shown \cref{fig:mandelbrot-hamsterjs}. A background-task is started using \javascriptinline/hamsters.run(...)/ (line \ref{code:hamsterjs-start}). The first argument are the parameters that are passed to the operation to execute that is passed as second argument. The third argument is the callback that is invoked when the operation is complete. The passed parameters are available as the global object \javascriptinline/params/ (line \ref{code:hamstersjs-params}) in the background task. Hamsters.js passes a sub array to each task leaving it to the background-operation to iterate over the sub-array elements. The data returned by the background task need to be written into the \javascriptinline/rtn.data/ (line \ref{code:hamsterjs-result}) array data is also defined globally. This requires additional care if typed languages are used and reduces code sharing between background-task logic and ui-thread logic.
+
+\begin{figure}
+\begin{javascriptcode}
+function computeMandelbrotLine () {
+	const options = params.options; |$\label{code:hamstersjs-params}$|
+	const width = options.imageWidth;
+	const input = params.array;
+
+	for (let i = 0; i < input; ++i) {
+		const y = input[i];
+		const line = new Uint8ClampedArray(width * 4);
+		// compute...
+		rtn.data.push(line); |$\label{code:hamsterjs-result}$|
+	}
+}
+
+const range = _.range(options.imageHeight);
+const params = {
+	array: range,
+	options
+};
+
+hamsters.run( |$\label{code:hamsterjs-start}$|
+	params,  
+	computeMandelbrotLine, 
+	result => console.log(result), 
+	hamsters.maxThreads, 
+	true);
+\end{javascriptcode}
+\caption{Mandelbrot Implementation using Hamsters.js}
+\label{fig:mandelbrot-hamsterjs}
+\end{figure}
+

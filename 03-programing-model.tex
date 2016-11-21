@@ -31,10 +31,10 @@ The global context of a task differs from the global context the function is def
 Parallel tasks are isolated from one another since each tasks operates on its own copy of the variables and every thread only executes on task at the time. However, the global state of a thread is shared among all tasks executed on this thread instances. Tasks can access and modify the global state. This is strongly discouraged as changes are only thread local --- and therefore not replicated between threads --- and may introduce memory leaks. 
 
 \subsection{Reactive API}
-The proposed work further offers a reactive api that provides automatic work partitioning and result joining. The api is inspired by the commonly used underscore and lodash libraries. The goal of this api is to provide a well known and understood api that uses the available computation resources without any further actions by the programer. This simplifies it for the programmer to transform synchronous implementations into parallelized ones. The api is based on top of the low level api and therefore the same restrictions apply. 
+The runtime system further offers a reactive api. This api is inspired by the commonly used underscore and lodash libraries and motivates the programer to define the computations as operations on data streams. The runtime system takes care of splitting the work into several sub tasks and aggregating the sub results to the end result. The created tasks perform all operations on a subset of the input values and are potentially executed concurrently if enough resources are available. The goal of this api is to provide a well known and understood api that uses the available computation resources without any further actions needed by the programer. This simplifies transforming synchronous code into parallelized. The reactive api uses the infrastructure provided by the low level api. Therefore, the same programing model applies.
 
-The api motivates the programer to define the computations as operations on a data flow. The defined operations on the data flow are chained together and are executed concurrently as multiple tasks. An implementation of the Mandelbrot computation using Paralle.es is shown in \cref{code:mandelbrot-parallel.es}. The implementation differs only slightly from the synchronous implementation shown in \cref{fig:mandelbrot-sync}. The task is defined from line \ref{code:parallel-es-definition-start} to \ref{code:parallel-es-definition-end} using the descriptive api. The \javascriptinline/range/ method defines the input as a range from 0 up to the image height. The object passed to \javascriptinline/inEnvironment/ is available to the function in the background task through an additional function parameter. The operation to apply to every element from the data stream is \javascriptinline/map/ with the passed mapping function \javascriptinline/computeMandelbrotLine/. The computation is started using the \javascriptinline/then/ operation (line \ref{code:parallel-es-start}) that registers a callback to invoke in case the computation succeeds --- an optional error callback can be defined as well. The then callback is executed in the ui-thread. The \javascriptinline/computeMandelbrotLine/ function (line \ref{code:parallel-es-operation}) --- that is executed on the background-thread --- has access to the current array element and as well to the \javascriptinline/environment/ object that was passed in the \javascriptinline/inEnvironment/ call. No additional build step is required.
 
+ An implementation of the Mandelbrot computation using the reactive api of Paralle.es is shown in \cref{code:mandelbrot-parallel.es}. The implementation differs only slightly from the synchronous implementation shown in \cref{fig:mandelbrot-sync}. The \javascriptinline/range/ method (line \ref{code:parallel-es-definition-start}) defines the data stream to process. It creates a data stream containing the values from 0 up to the image height. The input stream is transformed by mapping (\javascriptinline/map/ on line \ref{code:parallel-es-map}) each element from the input stream to an output element that is computed by the \javascriptinline/computeMandelbrotLine/ function (line \ref{code:parallel-es-operation}). The \javascriptinline/computeMandelbrotLine/ function --- that is executed in a background-thread --- has access to the current array element and as well to the \javascriptinline/environment/ object that was passed in the \javascriptinline/inEnvironment/ call. The computation is started using the \javascriptinline/then/ method (line \ref{code:parallel-es-start}) that registers a callback to invoke in case the computation succeeds --- an optional error callback can be defined as well. The then callback is executed in the master-thread.  No additional build step is required.
 
 \begin{figure}
 	\begin{javascriptcode}
@@ -48,7 +48,7 @@ function computeMandelbrotLine(y, environment) { |$\label{code:parallel-es-opera
 parallel      |$\label{code:parallel-es-definition-start}$|
 	.range(options.imageHeight)
 	.inEnvironment(options)
-	.map(computeMandelbrotLine) |$\label{code:parallel-es-definition-end}$|
+	.map(computeMandelbrotLine) |$\label{code:parallel-es-map}$|
 	.then(result => console.log(result); |$\label{code:parallel-es-start}$|
 	\end{javascriptcode}
 	
@@ -75,14 +75,4 @@ console.log(result);
 \caption{Synchronous Mandelbrot Implementation}
 \label{fig:mandelbrot-sync}
 \end{figure}
-
-%\subsection{Task Implementation}
-%A task is implemented by a JavaScript function. The 
-%
-%% The following is how it is implemented but not what the programing model defines
-%
-%This is inherited from the Web Worker programing model where each Worker uses its own memory and data exchange requires messaging\footnote{This might change with the SharedMemory~\cite{Ecma2016} standard that is currently a draft in stage 2.} resulting in various restrictions applying to the functions implementing a task. Some of these restrictions can be hidden by using the proposed code transpilation step described in TODO\todo{add ref}.
-%
-%It is prohibited for a task function to access any variables --- including functions and imports --- from its closure. This is rooted in the fact that the variables from the closure resist in the memory of the ui-thread and not in the thread executing the task. However, required data can be passed as function arguments to the task in question. Structured clone~\cite[Section 2.9.4]{WHATWG2016} is used to transfer data between threads.
-
 

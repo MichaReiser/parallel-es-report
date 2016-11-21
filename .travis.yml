@@ -4,7 +4,8 @@ services:
 before_install:
 - docker pull blang/latex
 script:
-- ./dockercmd.sh /bin/sh -c "pdflatex parallel-es.tex && pdflatex parallel-es.tex"
+- mkdir ".texpadtmp"
+- ./dockercmd.sh /bin/sh -c "pdflatex -interaction=nonstopmode -synctex=1 -shell-escape -output-directory=/.texpadtmp parallel-es.tex && pdflatex -interaction=nonstopmode -synctex=1 -shell-escape -output-directory=./texpadtmp parallel-es.tex"
 deploy:
   provider: releases
   api_key:

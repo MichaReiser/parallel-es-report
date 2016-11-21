@@ -1,0 +1,14 @@
+sudo: required
+services:
+- docker
+before_install:
+- docker pull blang/latex
+script:
+- ./dockercmd.sh /bin/sh -c "pdflatex parallel-es.tex && pdflatex parallel-es.tex"
+deploy:
+  provider: releases
+  api_key:
+    secure: XmTq6o5TRqn71tI68qh2Il+rZb1YcDg8RnoJUi+1ApVZ8oKP1rpp9CpBOdxV0hohHPBFJElOHWwn0bIbgrYgKNlW2RMNMYk5gjLvn2tArymwMJssu8L9ji75TsMexncyOObe9j4mPxWKtixM36RVn92FWSm5Pz8S1pZUoJefC1+EpDLa53vO5vddspCYIQs8Y9rTvQZaUymwRo5eWi3vHoZ68MfIWbxK+xUNFUUXtBhGlUMZNpL1/7v3e51cU8NrVE+uFBy9xjmJ4pEl8wavitEFZXTp1QptfpnjXrYd0GxxzvLIXbVfKPd25yzz9wnXo+9lCZu+3xsBKbzQN1Ma7GT2lIP7LRDeQctCMIfW/4K8+q2d9OrvN0oji7NiZAA9+Xb9mu6/CxtPtvSZ/369InXb71w/Z+Ho155u7eVIGBLLqeiIXg24v8MDfvY8agh3ee2fmhHQQONpov5KOXiwbI1SqPe0SR//0h28cuIemNQ57BqFrNrEKEbT1Iu+TGSHNctr0vXxwxzhOzfiAFe2Xl/aZQocWdVZme2aQtlg4dZUj8OQq1NDkOj+5DB2UweiQsa0hqYT6yplCnNYN3l4OfdLhJ+anQyvHEZ436O6yPjZC22Qz58hfuqVMhTyuFU6ilLi5zH3i4v++VMwCWPvQ36SnVkDQ7VYKKaApbIb2qM=
+  file: parallel-es.pdf
+  on:
+    repo: MichaReiser/parallel-es-report

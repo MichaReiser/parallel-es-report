@@ -1,20 +1,21 @@
 \section{Evaluation}\label{sec:evaluation}
-The evaluation focuses on computation intensive tasks or tasks over a large set of data that are expected to profit from parallelization. However, using the presented runtime system may also be beneficial for computations that cannot be parallelized by avoiding blocking the ui-thread and therefore, enhance the user experience. The evaluation compares the presented work with the solutions introduced in \cref{sec:related-work} in respect to the performance results and simplicity of application. 
+The evaluation focuses on computations that are expected to profit from parallelization, e.g. compute intensive tasks or tasks over a large set of data. However, using the presented runtime system may also be beneficial for long running, but not parallelized computations that otherwise would block the main-thread and result in a degraded user experience. The evaluation compares the presented work with the alternatives introduced in \cref{sec:related-work} in respect to performance and applicability to the following set of problems:
+
+\begin{itemize}
+	\item[$\bullet$] Mandelbrot 10'000x10'000: Computation of a Mandelbrot for a given image size. Requires a relatively large amount of memory compared to the computational time needed.
+	\item[$\bullet$] Knight Tour: Computes the number of open tours from a given start field. Low memory usage but very high computational needs.
+	\item[$\bullet$] Riskprofiling: Simulates the development of customer assets over a time period of 15 years by using a Monte Carlo simulation. The simulation used to determine the probability that the amount needed by an investment --- e.g. buying a house after 10 years --- is available at this point in time. Representation of a real world problem~\cite{Kwsoft2016}.
+\end{itemize}
 
 
-
-\subsection{Usability}
-The usability is evaluated by comparing the implementations for the Mandelbrot problem. The synchronous implementation is shown in \cref{fig:mandelbrot-sync}. The actual implementation of the per line computation is omitted for brevity as it is almost identical for all libraries. The preliminary focus is on type safety, readability, compactness and build system integration. However, some of the result might be subjective and represent the opinion of the author. The source code for all examples is available in a designated GitHub project~\cite{Reiser2016}. 
+\subsection{Applicability}
+The applicability is mainly evaluated by comparing the Mandelbrot implementations. The synchronous implementation of the Mandelbrot has been introduced in \cref{sec:programing-model} (\cref{fig:mandelbrot-sync}). The implementation of the per line computation is omitted for brevity since it is almost identical for all libraries. The preliminary focus of the evaluation is on readability and type safety. However, some of the result might be subjective and represent the opinion of the author. The source code for all examples is available on GitHub~\cite{Reiser2016}. 
 
 \paragraph{Parallel.js}
-The Mandelbrot implementation in Parallel.js is shown in \cref{fig:mandelbrot-paralleljs}. The first argument of the \javascriptinline/Parallel/ constructor (line \ref{code:paralleljs-definition}) is the data to process. The second --- optional ---  argument is an options-object affecting the behavior of Parallel.js. The value of the \javascriptinline/env/ property is exposed as \javascriptinline/global.env/ in the background thread (line \ref{code:paralleljs-global}). This use of the global, undeclared variable \javascriptinline/global/ to expose the data is problematic as it breaks static scoping and requires additional care if typed languages are used. One way to work around the problem is to manually declare the \javascriptinline/global/ variable every time it is used or globally in a declaration file and annotating its type. The global declaration is problematic as the type may differ depending on the problem leaving only the option to disable type checking for the variable at all by annotating a special opt-out type like \javascriptinline/any/ in TypeScript. Even with a per use declaration, type safety is no longer guaranteed as the type checker does not have the ability to check if the passed object in the environment property matches the structure of the declared \javascriptinline/global/ variable. The global variable also hinders that the same function can be called from the ui-thread as the variable in this case is not initialized. 
+The Mandelbrot implementation using the reactive api of Parallel.js is shown in \cref{fig:mandelbrot-paralleljs}. It differs only slightly from the synchronous implementation. A parallel task is created using the \javascriptinline/Parallel/ constructor (line \ref{code:paralleljs-definition}). The first constructor-argument is the data to process, the second --- optional ---  is an options-object affecting the task execution where the value of the \javascriptinline/env/ property is exposed as \javascriptinline/global.env/ in the background thread (line \ref{code:paralleljs-global}). The function passed to the \javascriptinline/map/ operation (line \ref{code:paralleljs-map}) is called for every element in the input array and produces the elements in the output array.
 
-Parallel.js provides a runtime feature that allows to include external files and other functions inside the started background-thread using the \javascriptinline/require/ function (line \ref{code:paralleljs-require}) without the need for static code transpiling as it is needed by Parallel.es. 
-
-Parallel.js also offers a reactive api resulting in an implementation that differs only slightly from the synchronous implementation. The function passed to the \javascriptinline/map/ operation (line \ref{code:paralleljs-map}) is called for every element in the input array and produces the elements in the output array.
-
-\begin{figure}
-	\begin{javascriptcode}
+\begin{listing}
+	\begin{javascriptcode*}{highlightlines={10-15}}
 function computeMandelbrotLine(y, options) {
 	const arraySize = options.imageWidth * 4;
 	const line = new Uint8ClampedArray(arraySize);
@@ -24,17 +25,25 @@ function computeMandelbrotLine(y, options) {
 
 const lines = _.range(options.imageHeight);
 
-new Parallel(lines, parallelOptions) |$\label{code:paralleljs-definition}$|
+new Parallel(lines, {env: options}) |$\label{code:paralleljs-definition}$|
 	.require(computeMandelbrotLine)  |$\label{code:paralleljs-require}$|
-	.map( |$\label{code:paralleljs-map}$|
-		line => computeMandelbrotLine(line, {env: options}) |$\label{code:paralleljs-global}$|
-	)
+	.map(function (line) { |$\label{code:paralleljs-map}$|
+		return computeMandelbrotLine(line, global.env)); |$\label{code:paralleljs-global}$|
+	})
 	.then(result => console.log(result));
-\end{javascriptcode}
+\end{javascriptcode*}
 
 \caption{Mandelbrot Implementation using Parallel.js}
 \label{fig:mandelbrot-paralleljs}
-\end{figure}
+\end{listing}
+
+
+The use of the global, undeclared variable \javascriptinline/global/ to expose additional data in the task is problematic since it breaks static scoping and requires additional care if typed languages are used. One way to work around the problem is to declare the \javascriptinline/global/ variable in every module it is used or globally in a declaration file. In both cases, no specific type can be annotated for the environment property since its type depends upon the concrete problem. This only leaves the option to disable type checking for the environment property at all by annotating a special opt-out type like \javascriptinline/any/ in TypeScript. Declaring the variable on a module basis or globally has the undesired side effect that the type checker no longer complains if the variable is actually undeclared if used outside of a task function. The global variable also hinders that the same function can be called from the main-thread. In this case, the \javascriptinline/global/ variable is undeclared and the function call fails.
+
+A powerful feature of the Parallel.js is the ability to include additional function in a task by using the \javascriptinline/require/ function (line \ref{code:paralleljs-require}) without the need for static code transpilation as it is by Parallel.es. These functions can then be called from inside of task functions. 
+
+Overall, the api of Parallel.js and Parallel.es are very similar. However, the api of the latter is type safe.
+
 
 \paragraph{Threads.js}
  The Mandelbrot implementation using threads.js is shown in \cref{fig:mandelbrot-threadsjs}. Threads.js does not use thread pools by default. A thread pool needs to be created manually if desired (line \ref{code:threadsjs-pool}). The function to execute in the background worker is defined using the \javascriptinline/run/ method on the pool (line \ref{code:threadsjs-worker}). A new task is created every time \javascriptinline/send/ is invoked to process the passed in element. The result can be retrieved by waiting until the promise of the task resolves. 
@@ -42,13 +51,13 @@ new Parallel(lines, parallelOptions) |$\label{code:paralleljs-definition}$|
 The final result over all tasks can be retrieved by waiting until all promises of the tasks are resolved.
 
 
-\begin{figure}
-	\begin{javascriptcode}
+\begin{listing}
+	\begin{javascriptcode*}{highlightlines={9-10, 14, 18-19}}
 function computeMandelbrotLine({ y, options}, done) {
 	const arraySize = options.imageWidth * 4;
-    const line = new Uint8ClampedArray(arraySize);
-    // compute...
-    done.transfer(line, [line.buffer]);
+	const line = new Uint8ClampedArray(arraySize);
+	// compute...
+	done.transfer(line, [line.buffer]);
 }
 
 const taskPromises = [];
@@ -57,25 +66,24 @@ pool.run(computeMandelbrotLine); |$\label{code:threadsjs-worker}$|
 
 const lines = _.range(options);
 for (const y of lines) {
-	const taskPromise = pool.send({ y, options})
-	                        .promise()); |$\label{code:threadsjs-messaging}$|
-	taskPromises.push(taskPromise);
+	const promise = pool.send({ y, options}).promise()); |$\label{code:threadsjs-messaging}$|
+	taskPromises.push(promise);
 }
 
 Promise.all(taskPromises)
 	.then(result => console.log(result));	
-\end{javascriptcode}
+\end{javascriptcode*}
 \caption{Mandelbrot Implementation using threads.js}
 \label{fig:mandelbrot-threadsjs}
-\end{figure}
+\end{listing}
 
 \paragraph{Hamsters.js}
-The implementation of the Mandelbrot is shown \cref{fig:mandelbrot-hamsterjs}. A background-task is started using \javascriptinline/hamsters.run(...)/ (line \ref{code:hamsterjs-start}). The first argument are the parameters that are passed to the task-function. The task-function is defined by the second argument. The third argument is the callback that is invoked when the operation has completed. The passed parameters are available on the global object in the \javascriptinline/params/ property(line \ref{code:hamstersjs-params}) in the background task. This is less problematic for type safety than it is the case for Parallel.js since some languages allow to define the type of the this \javascriptinline/this/ object. 
+The implementation of the Mandelbrot is shown in \cref{fig:mandelbrot-hamsterjs}. A background-task is started using \javascriptinline/hamsters.run(...)/ (line \ref{code:hamsterjs-start}). The first argument are the parameters that are passed to the task-function. The task-function is defined by the second argument. The third argument is the callback that is invoked when the operation has completed. The passed parameters are available on the global object in the \javascriptinline/params/ property(line \ref{code:hamstersjs-params}) in the background task. This is less problematic for type safety than it is the case for Parallel.js since some languages allow to define the type of the this \javascriptinline/this/ object. 
 
-Hamsters.js passes a sub array to each task leaving it to the background-operation to iterate over the sub-array elements. The data returned by the background task need to be written into the \javascriptinline/rtn.data/ (line \ref{code:hamsterjs-result}) array data is also defined globally. This requires additional care if typed languages are used and reduces code sharing between background-task logic and ui-thread logic.
+Hamsters.js passes a sub array to each task leaving it to the background-operation to iterate over the sub-array elements. The data returned by the background task need to be written into the \javascriptinline/rtn.data/ (line \ref{code:hamsterjs-result}) array data is also defined globally. This requires additional care if typed languages are used and reduces code sharing between background-task logic and main-thread logic.
 
-\begin{figure}
-\begin{javascriptcode}
+\begin{listing}
+\begin{javascriptcode*}{highlightlines={2, 4, 6, 10, 20}}
 function computeMandelbrotLine () {
 	const options = params.options; |$\label{code:hamstersjs-params}$|
 	const width = options.imageWidth;
@@ -101,20 +109,14 @@ hamsters.run( |$\label{code:hamsterjs-start}$|
 	result => console.log(result), 
 	hamsters.maxThreads, 
 	true);
-\end{javascriptcode}
+\end{javascriptcode*}
 \caption{Mandelbrot Implementation using Hamsters.js}
 \label{fig:mandelbrot-hamsterjs}
-\end{figure}
+\end{listing}
 
 
 \subsection{Performance Comparison}
-To compare the performance of the presented and related work the following set of problems is used:
-
-\begin{itemize}
-	\item[$\bullet$] Mandelbrot 10'000x10'000: Computation of a Mandelbrot for a given image size. Requires a relatively large amount of memory compared to the computational time needed.
-	\item[$\bullet$] Knight Tour: Computes the number of open tours from a given start field. Low memory usage but very high computational needs.
-	\item[$\bullet$] Riskprofiling: Simulates the development of the customers asset over a time period of 15 years by using a monte carlo simulation. The result of the simulation are used to determine the probability that the amount needed by an investment --- e.g. buying a house after 10 years --- is available at that point in time. Representation of a real world example~\cite{Kwsoft2016}.
-\end{itemize}
+The benchmark results are shown in \cref{fig:runtime-performance}. It shows the time needed by each implementation to compute the solution relative to the synchronous pendant. The code of the Parallel.es uses the transpiler to make imports available. The benchmark was performed using Firefox v50 on a Windows 10 computer with a 4-Core, 2.5 GHz Xeon E5-2609v2 processor\footnote{The results of the benchmarks only differ slightly when using Chrome or Safari. This is mostly rooted in the case that the optimization performed by the JIT compiler differs between browsers. However, the performance of parallel computations drops significantly in Microsoft Edge if the runtime system uses \javascriptinline/new Function/ or \javascriptinline/eval/ to create dynamic function instances --- that is the case for Hamsters.js and Threads.js. This observation has been reported and is confirmed by Microsoft~\cite{newFunctionWebWorkerEdge}.}. The results show that the achieved speedups are approximately identical for all tested runtime systems. The rest explains the causes for significant differences.
 
 \begin{figure*}
 	\input{Firefox-50.0}	
@@ -122,13 +124,12 @@ To compare the performance of the presented and related work the following set o
 	\label{fig:runtime-performance}
 \end{figure*}
 
-The results of the performance measurement are shown in \cref{fig:runtime-performance}. It shows the time needed by each implementation to compute the solution relative to the synchronous pendant. The code of the Parallel.es uses the transpiler to make imports available. The benchmark was performed using Firefox v50 on a Windows 10 computer with a 4-Core, 2.5 GHz Xeon E5-2609v2 processor\footnote{The results of the benchmarks only differ slightly when using Chrome or Safari. This is mostly rooted in the case that the optimization performed by the JIT compiler differs between browsers. However, the performance of parallel computations drops significantly in Microsoft Edge if the runtime system uses \javascriptinline/new Function/ or \javascriptinline/eval/ to create dynamic function instances --- that is the case for Hamsters.js and Threads.js. This observation has been reported and is confirmed by Microsoft~\cite{newFunctionWebWorkerEdge}.}. The results show that the speedup achieved is approximately identical for all tested runtime systems --- with some exceptions. 
 
-\paragraph{Knight Tour} The time needed to solve the knight tour problem is mainly determined by the available computational resources. The knight tour calculation is parallelized by computing the number of tours starting from a specific start-field-sequence and summarizing the  number of found tours at the end. Parallel.js creates new tasks executed on fresh worker instances for accumulating the sub results computed by two tasks. This results in a significant overhead for the smaller 5x5 board. However, the impact is no longer visible for the larger board where the computation of the tours takes a multitude of the accumulation overhead created by the separate step. 
+\paragraph{Knight Tour} The time needed to solve the knight tour problem is mainly determined by the available computational resources. The knight tour calculation is parallelized by computing the number of tours starting from a specific start-field-sequence and summarizing the  number of found tours at the end. Parallel.js creates new tasks executed on fresh worker instances for accumulating the sub results computed by two tasks. This results in a significant overhead for the smaller 5x5 board. However, the impact is no longer visible for the larger board where the computation of the tours takes a multitude of the accumulation overhead caused by the accumulation in separate tasks.
 
 Not as expected, the time needed to spawn the background-tasks seems to have no noticeable impact on the test results. Hamsters.js and Parallel.es use a single thread pool instance with pre spawned background-tasks. Parallel.js and Threads.js create new background-tasks for each test run.
 
-The test case of the 6x6 knight tour only shows significant differences for the Hamsters.js runtime system. The difference is rooted in the used distribution strategy of the start fields onto the tasks. Hamsters.js creates as many task as background-threads are available and evenly distributes the start-field-sequences across the tasks. However, some start-field-sequences require more time to compute then others, resulting in unused computation resources when other tasks complete early. Parallel.js and Threads.js always use a task size of 1. Parallel.es has been configured to use task size of 1 for the knight tour problem to avoid this situation.
+The test case of the 6x6 knight tour only shows significant differences for the Hamsters.js runtime system. The difference is rooted in the used distribution strategy of the start-fields onto the tasks. Hamsters.js creates as many task as background-threads are available and evenly distributes the start-field-sequences across these tasks. However, some start-field-sequences require more time to compute then others, resulting in unused computation resources when other tasks complete early. Parallel.js and Threads.js always use a task size of 1. Parallel.es has been configured to use task size of 1 for the knight tour problem to avoid this situation.
 
 \paragraph{Mandelbrot}
 The computation of the Mandelbrot is parallelized by distributing the computation of single lines onto the background-tasks. However, the computation time needed to compute a single line depends upon the position of the line in the image --- its a non-linear problem. This is the reason why the Hamsters.js based computations takes significantly longer, because of its even distribution of the work onto the background-threads. Tasks computing the center of the Mandelbrot take longer than the ones at the top and bottom shorter. Parallel.es also uses an even distribution but by default creates four-times as many tasks as background-threads are available. This has shown to be a good balance between having a large enough set of items to process by each task reducing the overhead for the task processing while still leaving some room to compensate for non-linear problems. 

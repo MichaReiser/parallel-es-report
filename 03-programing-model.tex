@@ -5,8 +5,8 @@ The programing model of Parallel.es motivates the programer to perform time inte
 A \textit{background task} --- further referred to as task --- represents a single asynchronous operation executed on a background-thread and is implemented by a JavaScript function. \Cref{fig:fibonacci-implementation} shows an example that computes the fibonacci number for the value 100 in a task and logs the result to the console. The task is started using the \javascriptinline/run/ method by passing the function to execute together with the arguments for the function call (line \ref{code:parallel-run}). The returned object implements the promise interface~\cite[Section 18.3.18]{ecmaScript2015} allowing to register a \javascriptinline/then/ callback that is invoked with the result if the computation was successful and an error handler (\javascriptinline/catch/) that is triggered otherwise. The callbacks are executed on the main-thread and allow retrieval of the result. 
 
 
-\begin{figure}
-	\begin{javascriptcode}
+\begin{listing}
+	\begin{javascriptcode*}{highlightlines={9-11}}
 function fib(num) {
 	if (num <= 2) {
     	return 1;
@@ -18,11 +18,11 @@ function fib(num) {
 parallel.run(fib, 100) |$\label{code:parallel-run}$|
 	.catch(error => console.error(error))
 	.then(result => console.log(result));	
-	\end{javascriptcode}
+	\end{javascriptcode*}
 
 	\caption{Fibonacci Implementation}
 	\label{fig:fibonacci-implementation}
-\end{figure}
+\end{listing}
 
 The valid task-functions are only a subset of all JavaScript functions since not all JavaScript features are allowed to be used. This is rooted in the fact that neither web workers nor child processes have a shared memory\footnote{This might change with the SharedMemory~\cite{Ecma2016} standard that is currently a draft in stage 2.} that can be used to store data accessed by different threads. It is therefore disallowed that a task-function references any variables or functions --- including imports from external files --- from the outer scope\footnote{The special identifiers \javascriptinline/this/ and \javascriptinline/super/ are treaded equally to other identifiers referring to variables from the outer scope and their usage inside of a task-function is therefore prohibited. This also implies that an arrow function used as task-function is semantically equal to a function expression.}. Data needed by a task function needs to be explicitly passed when the task is started and is serialized using the structured clone algorithm~\cite[Section 2.9.4]{WHATWG2016}. This enforces a pass-by-value semantic and requires that the passed data is serializable according to the structured clone standard, e.g. Functions, DOM-Elements and errors are not cloneable. The same applies for the result returned by the task. 
 
@@ -36,27 +36,7 @@ The runtime system further offers a reactive api. This api is inspired by the co
 
  An implementation of the Mandelbrot computation using the reactive api of Paralle.es is shown in \cref{code:mandelbrot-parallel.es}. The implementation differs only slightly from the synchronous implementation shown in \cref{fig:mandelbrot-sync}. The \javascriptinline/range/ method (line \ref{code:parallel-es-definition-start}) defines the data stream to process. It creates a data stream containing the values from 0 up to the image height. The input stream is transformed by mapping (\javascriptinline/map/ on line \ref{code:parallel-es-map}) each element from the input stream to an output element that is computed by the \javascriptinline/computeMandelbrotLine/ function (line \ref{code:parallel-es-operation}). The \javascriptinline/computeMandelbrotLine/ function --- that is executed in a background-thread --- has access to the current array element and as well to the \javascriptinline/environment/ object that was passed in the \javascriptinline/inEnvironment/ call. The computation is started using the \javascriptinline/then/ method (line \ref{code:parallel-es-start}) that registers a callback to invoke in case the computation succeeds --- an optional error callback can be defined as well. The then callback is executed in the master-thread.  No additional build step is required.
 
-\begin{figure}
-	\begin{javascriptcode}
-function computeMandelbrotLine(y, environment) { |$\label{code:parallel-es-operation}$|
-	const arrazSize = environment.imageWidth * 4;
-	const line = new Uint8ClampedArray(arraySize);
-	// compute...
-	return line;
-}
-
-parallel      |$\label{code:parallel-es-definition-start}$|
-	.range(options.imageHeight)
-	.inEnvironment(options)
-	.map(computeMandelbrotLine) |$\label{code:parallel-es-map}$|
-	.then(result => console.log(result); |$\label{code:parallel-es-start}$|
-	\end{javascriptcode}
-	
-	\caption{Mandelbrot Implementation in parallel.es}
-	\label{code:mandelbrot-parallel.es}
-\end{figure}
-
-\begin{figure}
+\begin{listing}
 	
 	\begin{javascriptcode}
 function computeMandelbrotLine(y, options) {
@@ -74,5 +54,26 @@ console.log(result);
 \end{javascriptcode}
 \caption{Synchronous Mandelbrot Implementation}
 \label{fig:mandelbrot-sync}
-\end{figure}
+\end{listing}
+
+\begin{listing}
+	\begin{javascriptcode*}{highlightlines={2, 8-12}}
+function computeMandelbrotLine(y, environment) { |$\label{code:parallel-es-operation}$|
+	const arrazSize = environment.imageWidth * 4;
+	const line = new Uint8ClampedArray(arraySize);
+	// compute...
+	return line;
+}
+
+parallel      |$\label{code:parallel-es-definition-start}$|
+	.range(options.imageHeight)
+	.inEnvironment(options)
+	.map(computeMandelbrotLine) |$\label{code:parallel-es-map}$|
+	.then(result => console.log(result); |$\label{code:parallel-es-start}$|
+	\end{javascriptcode*}
+	
+	\caption{Mandelbrot Implementation in parallel.es}
+	\label{code:mandelbrot-parallel.es}
+\end{listing}
+
 

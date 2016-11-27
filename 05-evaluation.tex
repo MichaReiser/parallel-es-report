@@ -46,13 +46,10 @@ Overall, the api of Parallel.js and Parallel.es are very similar. However, the a
 
 
 \paragraph{Threads.js}
- The Mandelbrot implementation using threads.js is shown in \cref{fig:mandelbrot-threadsjs}. Threads.js does not use thread pools by default. A thread pool needs to be created manually if desired (line \ref{code:threadsjs-pool}). The function to execute in the background worker is defined using the \javascriptinline/run/ method on the pool (line \ref{code:threadsjs-worker}). A new task is created every time \javascriptinline/send/ is invoked to process the passed in element. The result can be retrieved by waiting until the promise of the task resolves. 
- 
-The final result over all tasks can be retrieved by waiting until all promises of the tasks are resolved.
-
+ The Mandelbrot implementation using Threads.js is shown in \cref{fig:mandelbrot-threadsjs}. Threads.js can be used with or without thread pools. A thread pool needs to be created manually if one is desired (line \ref{code:threadsjs-pool}). The function to run in the background-thread is defined using the \javascriptinline/pool.run/ method (line \ref{code:threadsjs-worker}). A new task for this function is created every time \javascriptinline/send/ (line \ref{code:threadsjs-messaging}) is called where the passed in value is used as argument to call the function. The result of a single task can be retrieved by registering the \javascriptinline/done/ handler (line \ref{code:threadsjs-task-completion}). The sub results of the tasks have to be joined manually. The thread pool offers the event \javascriptinline/finished/ (line \ref{code:threadsjs-done}) that is called when all tasks of this pool have been completed\footnote{The finished event cannot be used if other tasks are executed on the thread pool.}.
 
 \begin{listing}
-	\begin{javascriptcode*}{highlightlines={9-10, 14, 18-19}}
+	\begin{javascriptcode*}{highlightlines={5, 8-9, 15-16, 19}}
 function computeMandelbrotLine({ y, options}, done) {
 	const arraySize = options.imageWidth * 4;
 	const line = new Uint8ClampedArray(arraySize);
@@ -60,51 +57,59 @@ function computeMandelbrotLine({ y, options}, done) {
 	done.transfer(line, [line.buffer]);
 }
 
-const taskPromises = [];
 const pool = new Pool(); |$\label{code:threadsjs-pool}$|
 pool.run(computeMandelbrotLine); |$\label{code:threadsjs-worker}$|
 
-const lines = _.range(options);
+const lines = _.range(options.imageHeight);
+const result = new Array(options.imageHeight);
 for (const y of lines) {
-	const promise = pool.send({ y, options}).promise()); |$\label{code:threadsjs-messaging}$|
-	taskPromises.push(promise);
+	pool
+		.send({ y, options }) |$\label{code:threadsjs-messaging}$|
+		.on("done", line => result[y] = line);|$\label{code:threadsjs-task-completion}$|
 }
 
-Promise.all(taskPromises)
-	.then(result => console.log(result));	
+pool.on("finished", () => console.log(result)); |$\label{code:threadsjs-done}$|
 \end{javascriptcode*}
 \caption{Mandelbrot Implementation using threads.js}
 \label{fig:mandelbrot-threadsjs}
 \end{listing}
 
-\paragraph{Hamsters.js}
-The implementation of the Mandelbrot is shown in \cref{fig:mandelbrot-hamsterjs}. A background-task is started using \javascriptinline/hamsters.run(...)/ (line \ref{code:hamsterjs-start}). The first argument are the parameters that are passed to the task-function. The task-function is defined by the second argument. The third argument is the callback that is invoked when the operation has completed. The passed parameters are available on the global object in the \javascriptinline/params/ property(line \ref{code:hamstersjs-params}) in the background task. This is less problematic for type safety than it is the case for Parallel.js since some languages allow to define the type of the this \javascriptinline/this/ object. 
 
-Hamsters.js passes a sub array to each task leaving it to the background-operation to iterate over the sub-array elements. The data returned by the background task need to be written into the \javascriptinline/rtn.data/ (line \ref{code:hamsterjs-result}) array data is also defined globally. This requires additional care if typed languages are used and reduces code sharing between background-task logic and main-thread logic.
+The Threads.js api offers a clean, flexible, messaging-based api to run single tasks in a background-thread but does not offer a higher level abstraction for common operations. This lack of higher level api complicates the migration of existing code since the programer needs to partition the work into different tasks and joining the sub-results. Furthermore, the programer is responsible to manage the lifetime of the thread pool. 
+
+\paragraph{Hamsters.js}
+The implementation of the Mandelbrot is shown in \cref{fig:mandelbrot-hamsterjs}. A background-task is started using \javascriptinline/hamsters.run/ (line \ref{code:hamsterjs-start}). The passed arguments have the following semantic:
+
+\begin{enumerate}
+	\item Object that is passed to the task-function. The special property \javascriptinline/array/ defines the input data. The object is exposed as \javascriptinline/params/ in the task-function.
+	\item The task-function that is executed in the background-thread.
+	\item Callback function that is invoked when the operation has completed.
+	\item Into how many tasks should the data be partitioned. 
+	\item Defines if the sub-results of the tasks are automatically joined (\javascriptinline/true/) into the end result.
+\end{enumerate}
+
+Hamsters.js automatically splits the input-data into sub-arrays that are to be processed by a single task. However, iterating over the elements in the sub-array is left to the task-function (line \ref{code:hamsterjs-iterate}). The result of the task-function must be written into the \javascriptinline/rtn.data/ array (line \ref{code:hamsterjs-result}) that is provided by Hamsters.js. 
 
 \begin{listing}
-\begin{javascriptcode*}{highlightlines={2, 4, 6, 10, 20}}
+\begin{javascriptcode*}{highlightlines={2-3, 14-22}}
 function computeMandelbrotLine () {
 	const options = params.options; |$\label{code:hamstersjs-params}$|
-	const width = options.imageWidth;
 	const input = params.array;
+	const arraySize = options.imageWidth * 4;
 
-	for (let i = 0; i < input; ++i) {
+	for (let i = 0; i < input; ++i) {|$\label{code:hamsterjs-iterate}$|
 		const y = input[i];
-		const line = new Uint8ClampedArray(width * 4);
+		const line = new Uint8ClampedArray(arraySize);
 		// compute...
 		rtn.data.push(line); |$\label{code:hamsterjs-result}$|
 	}
 }
 
-const range = _.range(options.imageHeight);
-const params = {
-	array: range,
-	options
-};
-
 hamsters.run( |$\label{code:hamsterjs-start}$|
-	params,  
+	params: {
+		array: _.range(options.imageHeight),
+		options
+	},  
 	computeMandelbrotLine, 
 	result => console.log(result), 
 	hamsters.maxThreads, 
@@ -114,9 +119,10 @@ hamsters.run( |$\label{code:hamsterjs-start}$|
 \label{fig:mandelbrot-hamsterjs}
 \end{listing}
 
+The api of Hamsters.js is a mixture of a low- and high-level api: On one hand it offers only a single \javascriptinline/run/ method, on the other advanced features like work partitioning, result joining, and even features like result caching. I believe that exposing all these features in a single method makes the api hard to use. It is difficult to remember the correct ordering or the semantics of the arguments. Even though the offered high level api, still most of the work is left to the programer like iterating over the input array elements. The api further has the disadvantage to not offer type safety because of the global, undeclared \javascriptinline/params/ and \javascriptinline/rtn/ variables in the task-function. These global variables also hinder code reuse because they are undeclared if the function is not used as a task-function. 
 
 \subsection{Performance Comparison}
-The benchmark results are shown in \cref{fig:runtime-performance}. It shows the time needed by each implementation to compute the solution relative to the synchronous pendant. The code of the Parallel.es uses the transpiler to make imports available. The benchmark was performed using Firefox v50 on a Windows 10 computer with a 4-Core, 2.5 GHz Xeon E5-2609v2 processor\footnote{The results of the benchmarks only differ slightly when using Chrome or Safari. This is mostly rooted in the case that the optimization performed by the JIT compiler differs between browsers. However, the performance of parallel computations drops significantly in Microsoft Edge if the runtime system uses \javascriptinline/new Function/ or \javascriptinline/eval/ to create dynamic function instances --- that is the case for Hamsters.js and Threads.js. This observation has been reported and is confirmed by Microsoft~\cite{newFunctionWebWorkerEdge}.}. The results show that the achieved speedups are approximately identical for all tested runtime systems. The rest explains the causes for significant differences.
+The benchmark results are shown in \cref{fig:runtime-performance}. It shows the time needed by each implementation to compute the solution relative to the synchronous pendant. The test setup uses Firefox 50 on a Windows 10 computer with a 4-Core, 2.5 GHz Xeon E5-2609v2 processor\footnote{The results of the benchmarks only differ slightly when using Chrome or Safari. This is mostly rooted in the cause that the optimization performed by the JIT compiler differs between browsers. However, the performance of parallel computations drops significantly in Microsoft Edge if the runtime system uses \javascriptinline/new Function/ or \javascriptinline/eval/ to create dynamic function instances --- that is the case for Hamsters.js and Threads.js. This observation has been reported and is confirmed by Microsoft~\cite{newFunctionWebWorkerEdge}.}. The results are explained in the rest of this section.
 
 \begin{figure*}
 	\input{Firefox-50.0}	
@@ -125,18 +131,27 @@ The benchmark results are shown in \cref{fig:runtime-performance}. It shows the 
 \end{figure*}
 
 
-\paragraph{Knight Tour} The time needed to solve the knight tour problem is mainly determined by the available computational resources. The knight tour calculation is parallelized by computing the number of tours starting from a specific start-field-sequence and summarizing the  number of found tours at the end. Parallel.js creates new tasks executed on fresh worker instances for accumulating the sub results computed by two tasks. This results in a significant overhead for the smaller 5x5 board. However, the impact is no longer visible for the larger board where the computation of the tours takes a multitude of the accumulation overhead caused by the accumulation in separate tasks.
+\paragraph{Knight Tour} The time needed to solve the knight tour problem is mainly determined by the available computational resources. The knight tour calculation is parallelized by computing the number of tours starting from a specific start-field-sequence and summarizing the  number of found tours at the end. 
 
-Not as expected, the time needed to spawn the background-tasks seems to have no noticeable impact on the test results. Hamsters.js and Parallel.es use a single thread pool instance with pre spawned background-tasks. Parallel.js and Threads.js create new background-tasks for each test run.
+Parallel.js creates new tasks that are executed on fresh worker instances for accumulating the sub results computed by two tasks. This results in a significant overhead for the smaller 5x5 board. However, the impact is no longer visible for the larger board where the computation of the tours takes a multitude of the accumulation overhead caused by accumulating in separate tasks.
 
-The test case of the 6x6 knight tour only shows significant differences for the Hamsters.js runtime system. The difference is rooted in the used distribution strategy of the start-fields onto the tasks. Hamsters.js creates as many task as background-threads are available and evenly distributes the start-field-sequences across these tasks. However, some start-field-sequences require more time to compute then others, resulting in unused computation resources when other tasks complete early. Parallel.js and Threads.js always use a task size of 1. Parallel.es has been configured to use task size of 1 for the knight tour problem to avoid this situation.
+The usage of a thread pool does not have the expected significance. In the results using Firefox the effect is not visible at all. However, the benchmarking results of Google Chrome shown in \cref{fig:runtime-performance-chrome} give evidence that a thread pool might actually be beneficial for very short running tasks. Thus, Hamsters.js and Parallel.es achieve slightly better results than Parallel.js, that is not using a thread pool at all, and Threads.js where manually a new thread pool is created for each execution\footnote{This is not strictly necessary. However, it is needed to store the simulation result for the risk profiling problem.}.
+
+\begin{figure}
+	\centering
+	\input{knight-tour-5x5Chrome-54.0.2840.99}
+	\caption{Knight Tour 5x5 Runtime Performance using Chrome}
+	\label{fig:runtime-performance-chrome}
+\end{figure}
+
+The test case of the 6x6 knight tour only shows significant differences for the Hamsters.js runtime system. The difference is rooted in the used distribution strategy of the start-field-sequences onto the tasks. Hamsters.js creates as many task as background-threads are available by evenly distributing the start-field-sequences across the background-threads. However, some start-field-sequences require more time to compute then others, resulting in unused computation resources when other tasks complete early. Parallel.js and Threads.js always use a task size of 1.
 
 \paragraph{Mandelbrot}
-The computation of the Mandelbrot is parallelized by distributing the computation of single lines onto the background-tasks. However, the computation time needed to compute a single line depends upon the position of the line in the image --- its a non-linear problem. This is the reason why the Hamsters.js based computations takes significantly longer, because of its even distribution of the work onto the background-threads. Tasks computing the center of the Mandelbrot take longer than the ones at the top and bottom shorter. Parallel.es also uses an even distribution but by default creates four-times as many tasks as background-threads are available. This has shown to be a good balance between having a large enough set of items to process by each task reducing the overhead for the task processing while still leaving some room to compensate for non-linear problems. 
+The Mandelbrot problem is parallelized by computing a subset of the lines per task. However, the computation time needed to compute a single line depends upon the position of the line in the image --- it is a non-linear problem. This is the reason why the Hamsters.js based implementation takes significantly longer, because of its even distribution of the work onto the background-threads. Tasks computing the center of the Mandelbrot take longer than the ones at the top or bottom of the field. Parallel.es also uses an even distribution but by default creates four-times as many tasks as background-threads are available. This has shown to be a good balance between having a large enough set of items to process by each task reducing the overhead for the task processing while still leaving some room to compensate for non-linear problems. 
 
 The performance gain of Threads.js compared to the other runtime system is rooted in the fact that Threads.js supports transferables~\cite[Section 2.7.4]{w3cHtml5}. Transferables allow to move a memory range between threads instead of copying it. Hamsters.js also support transferables, however, only if the input and output are objects supported by the transferable standard what is not the case for the Mandelbrot implementation.
 
 \paragraph{Riskprofiling}
-The risk profiling uses sim.js~\cite{simjs} in the monte carlo simulation as random number generator that supports seed numbers. This is needed to achieve reproducible forecasts. Hamsters.js lacks support for importing functions from external files and is therefore not part of this evaluation. The problem is parallelized by computing the outcome for a sub set of investments in each task. However, this requires that each background-thread simulates the development of the customer assets over the years once to get the data needed to calculate the outcome for an investment. Only a smaller speedup can be achieved by parallelizing this problem since the simulation requires significant more time to compute than for calculating the outcome of the investments, only a lower speedup can be achieved. 
+The risk profiling implementation uses sim.js~\cite{simjs} in the monte carlo simulation as random number generator that supports seed numbers. This is needed to achieve reproducible forecasts. Hamsters.js lacks support for importing functions from external files and is therefore not part of this evaluation. The problem is parallelized by computing the outcome for a sub set of investments in each task. However, this requires that each background-thread has to perform the monte carlo simulation to get the data needed to calculate the outcome for an investment. Therefore, only a smaller speedup can be achieved by parallelizing this problem since the simulation requires significant more time to compute than for calculating the outcome of the investments. 
 
-Parallel.es requires more time for the computation because of the work splitting strategy used. Parallel.es distributes the investments evenly onto the background-threads. However, computing the result for an investment is non linear. It depends on the year in which the investment takes place, the later this is the case, the more values have to be computed. This non linear computation time results in some tasks completing earlier than others leaving computation resources unused. Reducing the task-size to 1 is no solution in this case as this result in recomputing the asset development for each investment reducing the performance even more. Parallel.js and Threads.js can only use a task size of 1 as the thread pool is not reused and therefore side effects in the background-tasks can be used to temporary store the simulation outcome in a global variable. This is not desired in a shared thread pool as it results in memory leaks.
+Parallel.es requires more time for the computation because of the work splitting strategy used. Parallel.es distributes the investments evenly onto the background-threads. However, computing the result for an investment is non linear. It depends on the year in which the investment takes place, the later this is the case, the more values have to be computed. This non linear computation time results in some tasks completing earlier than others leaving computation resources unused. Specifying a task-size of one is not a solution for this problem as this result in recomputing the asset development for each investment reducing the performance even more. Parallel.js and Threads.js can only use a task-size of one as the thread pool is not reused and therefore side effects in the background-tasks can be used to temporary store the simulation outcome in a global variable. This is not desired in a shared thread pool as it results in memory leaks.

@@ -1,22 +1,25 @@
 %%%%%%%%%%-----PACKAGES
+% this package can be used to improve spacing between words.
+\usepackage{microtype}
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+
 % Tables
 \usepackage{booktabs}
 \newcommand{\ra}[1]{\renewcommand{\arraystretch}{#1}}
 
 \setlength{\marginparwidth}{1.3cm}
+
+% Tiks, Todo
 \usepackage[obeyFinal]{todonotes}
-
-% this package can be used to improve spacing between words.
-\usepackage{microtype}
-\usepackage[utf8]{inputenc}
-
 \usepackage{tikz}
 
-\usepackage[backend=biber, block=ragged, style=ieee]{biblatex} % ragged for nice formatted links in bibliography
+% Biblio 
+\usepackage[backend=biber, style=ieee]{biblatex} % ragged for nice formatted links in bibliography
 \bibliography{bibliography}
 
 % References
-\usepackage{hyperref}
+\usepackage[breaklinks=true, pdfpagelayout=SinglePage, pdfstartview=Fit]{hyperref}
 \usepackage{cleveref}
 \hypersetup{allcolors = {black}, colorlinks}
 

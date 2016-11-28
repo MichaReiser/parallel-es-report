@@ -1,9 +1,9 @@
 \section{Transpiler}\label{sec:transpiler}
-The absence of a shared memory that is accessible by all threads results in various limitations applying to task-functions. These limitations are described in the previous section and have in common, that no symbols from the outer scope are allowed to be referenced from inside of a task-function. This impedes code reuse and hinders a seamless integration into existing code. The presented transpiler hides the limitations of the runtime system from the programer by rewriting the task-start and task-functions.
+The absence of a shared and by all threads accessible memory results in various limitations that apply to task-functions. These limitations are described in the previous section and have in common, that no symbols from the outer scope are allowed to be referenced from inside of a task-function. This impedes code reuse and hinders a seamless integration into existing code. The presented transpiler hides the limitations of the runtime system from the programer by rewriting the task-start and task-functions.
 
-The transpiler is based on top of webpack\footnote{A JavaScript module bundler}~\cite{webpack} and Babel\footnote{Framework for transforming JavaScriptCode}~\cite{babel}. It extracts the task-functions from the code, adds it to the file loaded by the slaves, adds required import statements and pre-registers the task-function in the slaves function-cache. 
+The transpiler is based on top of webpack\footnote{A JavaScript module bundler}~\cite{webpack} and Babel\footnote{Framework for transforming JavaScript code}~\cite{babel}. It extracts the task-functions from the code, adds it to the file loaded by the slaves, adds required import statements and pre-registers the task-function in the slave's function-cache. 
 
-The Mandelbrot implementation referencing the \javascriptinline/imageWidth/ variable (line \ref{code:mandelbrot-reference1-imageWidth}, \ref{code:mandelbrot-reference2-imageWidth}) and the function \javascriptinline/computePixel/ (line \ref{code:mandelbrot-compute-pixel}) from the outer scope is shown in \cref{fig:mandelbrot-untranspiled}. The transpiler rewrites the code and makes the \javascriptinline/imageWidth/ variable and the \javascriptinline/computePixel/ function available in the task-function. The transpiled code is shown in \cref{fig:mandelbrot-transpiled}. The transpiler creates a new function that returns an object containing the values of all referenced variables and inserts it above the definition of the task-function (line \ref{code:mandelbrot-environment-extractor}). This function is used to extract the current values of the referenced variables in the master-thread. The object returned by the function is made available inside the task by passing it to the \javascriptinline/inEnvironment/ (line \ref{code:mandelbrot-environment-call}). The transpiler further replaces the task-definition by a unique function-id (line \ref{code:mandelbrot-function-id}) that the slave uses to resolve the function from the function-cache\footnote{The task-function is not replaced if it is defined using a function declaration since it might be used by other code. Task-functions declared using function declarations that are only referenced from a parallel call are removed by webpack using tree shaking.}. 
+The Mandelbrot implementation referencing the \javascriptinline/imageWidth/ variable (line \ref{code:mandelbrot-reference1-imageWidth}, \ref{code:mandelbrot-reference2-imageWidth}) and the function \javascriptinline/computePixel/ (line \ref{code:mandelbrot-compute-pixel}) from the outer scope is shown in \cref{fig:mandelbrot-untranspiled}. The transpiler rewrites the code and makes the \javascriptinline/imageWidth/ variable and the \javascriptinline/computePixel/ function available in the task-function. The transpiled code is shown in \cref{fig:mandelbrot-transpiled}. The transpiler creates a new function that returns an object containing the values of all referenced variables and inserts it above the definition of the task-function (line \ref{code:mandelbrot-environment-extractor}). This function is used to extract the current values of the referenced variables in the master-thread. The object returned by the function is made available inside the task by setting it as environment using the \javascriptinline/inEnvironment/ method (line \ref{code:mandelbrot-environment-call}). The transpiler further replaces the task-definition by a unique function-id (lines \ref{code:mandelbrot-function-id-start}-\ref{code:mandelbrot-function-id-end}) that the slave uses to resolve the function from the function-cache\footnote{The task-function is not replaced if it is defined using a function declaration since it might be used by other code. Task-functions declared using function declarations that are only referenced from a parallel call are removed by webpack using tree shaking.}. 
 
 
 \begin{listing}
@@ -27,7 +27,7 @@ parallel
 		return line;
 });	
 	\end{javascriptcode*}
-	\caption{Mandelbrot Implementation Referencing Symbols From Outer Scope}
+	\caption{Mandelbrot Implementation Referencing Symbols from the Outer Scope}
 	\label{fig:mandelbrot-untranspiled}
 \end{listing}
 
@@ -49,10 +49,10 @@ function _environmentExtractor() { |$\label{code:mandelbrot-environment-extracto
 
 parallel.range(imageHeight)
 	.inEnvironment(_environmentExtractor()) |$\label{code:mandelbrot-environment-call}$|
-	.map({ |$\label{code:mandelbrot-function-id}$|
+	.map({ |$\label{code:mandelbrot-function-id-start}$|
 		identifier: "static:file.js/_entry_anonymous",
 		_______isFunctionId: true
-	});	
+	});	|$\label{code:mandelbrot-function-id-end}$|
 \end{javascriptcode*}
 \caption{Transpiled Mandelbrot Implementation}
 \label{fig:mandelbrot-transpiled}
@@ -60,25 +60,25 @@ parallel.range(imageHeight)
 
 
 
-The code inserted by the transpiler into the script run by the slave is shown in \cref{fig:transpiled-mandelbrot-slave}. The transpiler injects the code of the task-function (line \ref{code:slave-task-function}) and the referenced \javascriptinline/computePixel/ function (line \ref{code:slave-compute-pixel})\footnote{The transpiler creates an immediately invoked function expression to isolate the task-functions of different files and avoiding naming clashes}. It further generates an \textit{entry}-function (line \ref{code:slave-entry-function}) that initializes the \javascriptinline/imageWidth/ variable (line \ref{code:slave-image-width}) with the value stored in the environment variable --- that contains the latest value from the master-thread --- and calls the actual task-function. The entry function is registered in the function cache (line \ref{code:slave-register-function}) using the same function id as used in the master-thread. This allows the slave to retrieve the function immediately from the function cache without the need to request the function definition from the master --- that requires (de-) serialization of the function.
+The code inserted by the transpiler into the script run by the slave is shown in \cref{fig:transpiled-mandelbrot-slave}. The transpiler injects the code of the task-function (lines \ref{code:slave-task-function-start}-\ref{code:slave-task-function-end}) and the referenced \javascriptinline/computePixel/ function (lines \ref{code:slave-compute-pixel-start}-\ref{code:slave-compute-pixel-end})\footnote{The transpiler also creates an immediately invoked function expression that isolates the task-functions of different modules and avoids naming clashes}. Further, an \textit{entry}-function (lines \ref{code:slave-entry-function-start}-\ref{code:slave-entry-function-end}) is generated that initializes the \javascriptinline/imageWidth/ variable (line \ref{code:slave-image-width}) with the value stored in the environment --- that contains the values of the variables from the main-thread --- and calls the actual task-function. The entry function is registered in the function cache (lines \ref{code:slave-register-function-start}-\ref{code:slave-register-function-end}) using the same function id as used in the master-thread. This allows the slave to retrieve the function immediately from the function cache without the need to request the function definition from the master --- that requires (de-) serialization of the function.
 
 \begin{listing}
 \begin{javascriptcode*}{highlightlines={1, 2, 7-8, 15, 26-27}}
 var imageWidth; |$\label{code:slave-image-width}$|
-function computePixel(x, y) { |$\label{code:slave-compute-pixel}$|
+function computePixel(x, y) { |$\label{code:slave-compute-pixel-start}$|
 	//...
-	return 0;
-}
+	return n;
+}|$\label{code:slave-compute-pixel-end}$|
 
-function _anonymous(y) { |$\label{code:slave-task-function}$|
+function _anonymous(y) { |$\label{code:slave-task-function-start}$|
 	var line = new Uint8ClampedArray(imageWidth * 4);
 	for (var x = 0; x < imageWidth; ++x) {
 		line[x * 4] = computePixel(x, y);
 	}
 	return line;
-}
+}|$\label{code:slave-task-function-end}$|
 
-function _entry_anonymous() { |$\label{code:slave-entry-function}$|
+function _entry_anonymous() { |$\label{code:slave-entry-function-start}$|
 	try {
 		var _environment = arguments[arguments.length - 1];
 		imageWidth = _environment.imageWidth;
@@ -86,18 +86,20 @@ function _entry_anonymous() { |$\label{code:slave-entry-function}$|
 	} finally {
 		imageWidth = undefined;
 	}
-}
+}|$\label{code:slave-entry-function-end}$|
 
-slaveFunctionLookupTable.registerStaticFunction({ |$\label{code:slave-register-function}$|
+slaveFunctionLookupTable.registerStaticFunction({ |$\label{code:slave-register-function-start}$|
 	identifier: 'static:file.js/_entry_anonymous',
 	_______isFunctionId: true
-}, _entry_anonymous);
+}, _entry_anonymous); |$\label{code:slave-register-function-end}$|
 \end{javascriptcode*}
 \caption{Generated Slave-Code for Transpiled Mandelbrot Implementation}
 \label{fig:transpiled-mandelbrot-slave}
 \end{listing}
 
-The transpiler further generates source-maps that point back to the original location of the extracted task-functions --- and transitive functions. This enables a true debugging experience that allows to set break points inside of the browser-developer tools\footnote{This is currently only supported by the developer tools of Google Chrome and Microsoft Edge.}. Without the source-maps, breaking inside of a task-function is only possible by using the inflexible \javascriptinline/debugger/ statement. The source-maps further allow the browser to translate error messages back to the original code. The source-map support is a distinct feature not provided by any of the related work.
+The transpiler further generates source-maps that point back to the original location of the extracted task-function --- and transitive functions. This enables a true debugging experience that allows to set break points inside of the browser-developer tools\footnote{This is currently only supported by the developer tools of Google Chrome and Microsoft Edge.}. Without these source-maps, breaking inside of a task-function is only possible by using the inflexible \javascriptinline/debugger/ statement. The source-maps further allow the browser to translate error messages back to the original code. The source-map support is a distinct feature not provided by any of the related work.
 
 \subsection{Limitations}
-The current implementation of the transpiler supports the reactive api, however, there are no technical limitations that prevent supporting the low-level api. The transpiler is limited to only allow references to constant-variables --- either the variable is declared as \javascriptinline/const/ or the value does not change after the initialization. Furthermore, symbols referring to functions or imports need to be resolvable using lexical scoping, e.g. its not supported to call a function that has been passed as function-argument, hence the transpiler does not use any data flow analysis for symbol resolution. Finally, the transpiler only supports ES6 modules and import statements.
+The current implementation of the transpiler only supports the reactive api even though no technical reason exists for this limitation. However, the transpiler is limited to only allow references to constant-variables --- either the variable is declared as \javascriptinline/const/ or the value does not change after the initialization. This is intentionally to avoid concurrent read-write access from different threads. 
+
+The current implementation only use static scoping to resolve imports and functions. Functions and imports where the resolution requires data flow analysis is therefore not supported, e.g. it is therefore unsupported to call a function that has been passed as a function-argument. For the same reason, only ES6 modules and imports are supported.

@@ -7,6 +7,22 @@ The evaluation focuses on computations that are expected to profit from parallel
 	\item[$\bullet$] Risk profiling: Simulates the development of customer assets over a period of 15 years by using a Monte Carlo simulation. The simulation is used to determine the probability that the amount needed by an investment --- e.g. buying a house after 10 years --- is available at this point in time. This problem is an instance of a real-world problem~\cite{Kwsoft2016}.
 \end{itemize}
 
+The versions used of the evaluated runtime systems are shown in \cref{tab:runtime-system-version}.
+
+\begin{table}
+	\centering
+	\begin{tabular}{p{0.6\linewidth} l}
+		\toprule
+		Runtime System & Version \\ \midrule
+		Parallel.es & 0.1.14 \\
+		Hamsters.js & 3.9.0\footnote{The version used is based on 3.9.0 but contains a fix for input-data that is not a typed array (\url{https://github.com/austinksmith/Hamsters.js/issues/16}).} \\
+		Parallel.js & 0.2.x\footnote{Latest version from master as mentioned in \cref{sec:related-work}.} \\
+		Threads.js & 0.7.2 \\ \bottomrule
+	\end{tabular}
+	\caption{Versions of Evaluated Runtime Systems}
+	\label{tab:runtime-system-version}
+\end{table}
+
 
 \subsection{Applicability}
 The applicability is mainly evaluated by comparing the Mandelbrot implementations. The synchronous and Parallel.es based implementations of the Mandelbrot have been introduced in \cref{sec:programing-model} and are shown in \cref{fig:mandelbrot-sync,code:mandelbrot-parallel.es}. The implementation of the per line computation is omitted for brevity since it is almost identical for all libraries. The preliminary focus of the evaluation is on readability and type safety. However, some of the result might be subjective and represent the opinion of the author. The source code for all examples is available on GitHub~\cite{Reiser2016}. 

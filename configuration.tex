@@ -23,6 +23,11 @@
 \usepackage{cleveref}
 \hypersetup{allcolors = {black}, colorlinks}
 
+% Footnotes in tables http://tex.stackexchange.com/questions/109467/footnote-in-tabular-environment
+\usepackage{footnote}
+\makesavenoteenv{tabular}
+\makesavenoteenv{table}
+
 %%%%%%%%%%-----Code listening examples
 \usepackage[newfloat, outputdir=.texpadtmp, section]{minted}
 \usemintedstyle{bw}

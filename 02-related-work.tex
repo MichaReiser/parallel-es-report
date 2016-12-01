@@ -1,8 +1,8 @@
 \section{Related Work}\label{sec:related-work}
-There exist various open source projects addressing similar or equal goals. This section describes the differences of the presented work to the already existing ones. One main difference of the presented system to the related work is that it offers the same debugging functionalities as developers are used to when working with synchronous code.
+There exist various open source projects addressing similar or equal goals. This section describes the differences in the presented work to the already existing ones. One main difference of the presented system to the related work is that it offers the same debugging functionalities as developers are used to when working with synchronous code.
 
 \subsection{Hamsters.js}
-Hamsters.js~\cite{hamstersjs} is the library with the highest attention measured by the number of GitHub stars. It provides a low-level API for running functions in a background thread. The background threads are managed in a global thread pool. In addition, various helper functionalities like array sorting, aggregating or caching are provided. The library has support for transferable objects and claims to support scheduling threads from a background thread. 
+Hamsters.js~\cite{hamstersjs} is the library with the highest attention measured by the number of GitHub stars. It provides a low-level API for running functions in a background thread. The background threads are managed in a global thread pool. Also, various helper functionalities like array sorting, aggregating or caching are provided. The library has support for transferable objects and claims to support scheduling threads from a background thread. 
 
 The main difference to Hamsters.js is that the proposed work offers a higher-level API that simplifies parallelization. 
 
@@ -15,6 +15,6 @@ This work differs from Parallel.js in the fact that a thread pool is used that r
 The latest published version on npm\footnote{NPM is a JavaScript Package Manager. The latest published version to date of Parallel.js is 0.2.1.} spawns a separate worker for every element in the input array exhausting the thread limit of the browser. The latest version on GitHub has adjusted this behavior to only spawn as many workers as logical processors are offered by the hardware. Therefore, when Parallel.js is referenced, the latest version\footnote{Commit 2e4b36bf16e330abaaff213e772fcf4074fd866b} from GitHub is meant.
 
 \subsection{Threads.js}
-Thread.js~\cite{Wermke2016} aims to be a powerful, but simple to use multi-threading library for NodeJS and the browser. Like Parallel.js, child processes are used in NodeJS and web workers in the browser.
+Thread.js~\cite{Wermke2016} aims to be a powerful, but simple to use, multi-threading library for NodeJS and the browser. Like Parallel.js, child processes are used in NodeJS and web workers in the browser.
 
-The main difference of Threads.js is that it is messaging based. It, therefore, fits better to the programming model used by web workers and child processes. However, this requires that the programmer bridges the gap between the programming model used inside the application and the messaging based programming model of Threads.js.
+The main difference of Threads.js is that it is messaging based. It, therefore, fits better to the programming model used by web workers and child processes. However, this requires that the programmer bridge the gap between the programming model used inside the application and the messaging based programming model of Threads.js.

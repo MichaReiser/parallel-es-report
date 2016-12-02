@@ -4,7 +4,7 @@ The evaluation focuses on computations that are expected to profit from parallel
 \begin{itemize}
 	\item[$\bullet$] Knight Tour: Computes the number of open tours from a given start field. Low memory usage but very high computational needs.
 	\item[$\bullet$] Mandelbrot 10'000x10'000: Computation of a Mandelbrot for a given image size. This problem requires a relatively large amount of memory compared to the computational time needed.
-	\item[$\bullet$] Risk profiling: Simulates the development of customer assets over a period of 15 years by using a Monte Carlo simulation. The simulation is used to determine the probability that the amount needed by an investment --- e.g. buying a house after ten years --- is available at this point in time. This problem is an instance of a real-world problem~\cite{Kwsoft2016}.
+	\item[$\bullet$] Risk Profiling: Simulates the development of customer assets over a period of 15 years by using a Monte Carlo simulation. The simulation is used to determine the probability that the amount needed by an investment --- e.g. buying a house after ten years --- is available at this point in time. This problem is an instance of a real-world problem~\cite{Kwsoft2016}.
 \end{itemize}
 
 The versions used by the evaluated runtime systems are shown in \cref{tab:runtime-system-version}.
@@ -166,10 +166,13 @@ The Mandelbrot problem is parallelized by computing a subset of the lines per ta
 
 The performance gain of Threads.js compared to the other runtime system is rooted in the fact that Threads.js supports transferables~\cite[Section 2.7.4]{w3cHtml5}. Transferables allow moving a memory range between threads instead of copying it. Hamsters.js also support transferables, however, only if the input and output are objects supported by the transferable standard what is not the case for the Mandelbrot implementation.
 
-\paragraph{Risk profiling}
+\paragraph{Risk Profiling}
 The risk profiling implementation uses sim.js~\cite{simjs} in the Monte Carlo simulation as random number generator that supports seed numbers. This is needed to achieve reproducible forecasts. Hamsters.js lacks support for importing functions from external files and is therefore not part of this evaluation. The problem is parallelized by computing the outcome for a subset of investments in each task. However, this requires that each background thread has to perform the Monte Carlo simulation to get the data needed to calculate the outcome for an investment. Therefore, only a smaller speedup can be achieved by parallelizing this problem since the simulation requires significantly more time to compute than for calculating the outcome of a single investment. 
 
 Parallel.es requires more time for the computation because of the work splitting strategy used. Parallel.es distributes the investments evenly onto the background threads. However, computing the result of an investment is nonlinear. It depends on the year in which the investment takes place, the later this is the case, the more values have to be computed. This nonlinear computation time results in some tasks completing earlier than others leaving computation resources unused. Specifying a task-size of one is not a solution for this problem as this result in recomputing Monte Carlo simulation for each investment reducing the performance even more. Parallel.js and Threads.js can only use a task-size of one as the thread pool is not reused and therefore, side effects in the background-threads can be used to temporary store the simulation outcome in a global variable. This is not desired if a shared background threads from a thread pool are used as it results in having potential memory leaks.
 
-\paragraph{Recursive Tasks}
-TODO oder Weglassen? Knight Tours ist eigentlich ein Recursive Task. Benötigt Momentan eine Aufteilung, damit überhaupt lösbar. Anderes Beispiel wäre Quick Sort. Ggf. noch Beispiel von Github suchen? Ebenso nicht lösbar bei allen Implementierungen sind Tasks welche gegenseitige Wartebedinungen haben (ok, mit viel würgen geht das evtl mit Threads.js)
+\paragraph{Recursive Tasks} 
+
+None of the evaluated libraries allow modeling recursive problems like the Knight-Tour or Quicksort naturally. Recursive problems have the characteristic that the input data for the subproblems is computed in the same step as the problem is solved. The backtracking based Knight Tour algorithm starts with a field and creates branches for every possible move by recursively descending for each distinct path allowing to parallelize the problem by computing each path in a separate task.  This strategy requires a runtime system allowing to start subtasks from inside a task where any background thread can execute the created subtask. The current implementation does not support this scenario and therefore, the main thread precomputes start-field sequences that are solved synchronously inside of a single task without further dividing into subtasks.
+
+Further research is required to determine how recursive tasks can be supported in an environment without shared memory and the \enquote{run to completion} model

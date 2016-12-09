@@ -24,32 +24,41 @@ parallel.run(fib, 100) |$\label{code:parallel-run}$|
 	\label{fig:fibonacci-implementation}
 \end{listing}
 
-Not every JavaScript function is a sound task function. This limitation is rooted insofar that neither web workers nor child processes have a shared memory\footnote{This might change with the SharedMemory~\cite{Ecma2016} standard that is currently a draft in stage 2.} that can be used to store data accessed by different threads. It is, therefore, disallowed that a task function references symbols --- variables, functions, or imports from external files --- from the outer scope\footnote{The special identifiers \javascriptinline/this/ and \javascriptinline/super/ are treated equally to other identifiers referring to variables from the outer scope, and their usage inside of a task function is therefore prohibited. This restriction also implies that an arrow function used as task function is semantically equal to a function expression.}. Illegal references to symbols from outer scope result in runtime errors thrown by the runtime environment. Therefore, all data needed by a task function has to be explicitly passed when the task is started and is serialized using the structured clone algorithm~\cite[Section 2.9.4]{WHATWG2016}. The structured cloning enforces a pass-by-value semantic and requires that the passed data be serializable, e.g. Functions, DOM-Elements and Errors are not cloneable. The same applies to the result returned by the task. 
+The sound task-functions are a subset of all JavaScript functions. Task-functions can refer to arbitrary, non-shared variables declared inside of the task-function. However, references to symbols from the outer scope are restricted: References to non-read-only variables are prohibited\footnote{The special identifiers \javascriptinline/this/ and \javascriptinline/super/ are treated equally to other identifiers referring to variables from the outer scope, and their usage inside of a task function is therefore prohibited. This restriction also implies that an arrow function used as task function is semantically equal to a function expression.} and as well references to functions that are not resolvable by using static scoping, e.g. functions passed as arguments in a function call. The referenced variables are passed by-value by creating a structured clone~\cite[Section 2.9.4]{WHATWG2016}. The structured cloning requires that the passed variables be serializable, e.g. Functions, DOM-Elements, and Errors are not cloneable. The result returned by the task is also passed by-value-semantic requiring to be structured cloneable as well. References to non-read-only variables are detected and prevented by the transpiler. However, the transpiler does not prevent references to undeclared variables since these variables might be globally defined by the runtime environment and therefore, result in runtime errors\footnote{To identify references to undeclared variables either a typed language can be used or a linter like ESLint~\cite{eslint} that is designed therefore.}.
 
-The global context in which a task function is defined differs from the global context of the background threads executing the task function.  Changes made to the global context of one thread are not visible to the other threads since each thread has its own global context and the runtime system does not reflect the changes among these. Therefore, the global context cannot be used to store shared state.  Furthermore, the APIs accessible in background threads may vary from the one offered in the main thread, e.g. the DOM API is not accessible to web workers.  These are no significant limitations for task functions since they perform in general compute intensive, but side effect free, operations only depending on local data.
+The global context in which a task function is defined differs from the global context of the background threads executing the task function. Changes made to the global context of one thread are not visible to the other threads since each thread has its own global context. Therefore, the global context cannot be used to store shared state.  Furthermore, the APIs accessible in background threads may vary from the one offered in the main thread, e.g. the DOM API is not accessible to web workers.  These are no significant limitations for task functions since they perform in general compute intensive, but side effect free, operations only depending on local data.
 
-Parallel tasks are isolated from one another since tasks share no variables and every thread executes one task at a time. However, the tasks executed in a specific background thread share the same global state. It is, therefore, possible that a task affects another task if they access and modify the same global state. Modification to the global state can not be prevented by the runtime system but are strongly discouraged as changes are only thread-local --- and therefore, not replicated between threads --- and may introduce memory leaks. 
+Parallel tasks are isolated from one another since tasks share no variables and every thread executes one task at a time. However, the tasks executed in a specific background thread share the same global state. It is, therefore, possible that a task affects another task if they access and modify the same global state. Modification to the global state are not prevented but are strongly discouraged as changes are only thread-local --- and therefore, not replicated between threads --- and may introduce memory leaks. 
 
 \subsection{Reactive API}
-The runtime system further offers a reactive API. It is inspired by the commonly used underscore~\cite{underscorejs} and lodash~\cite{lodash} libraries and motivates the programmer to define the computations as operations on data streams. The runtime system takes care of splitting the work into several sub-tasks and aggregating the sub-results into the end-result. The created tasks perform all operations on a subset of the input values and are potentially executed concurrently. The goal of this API is to provide a well-known and understood API that uses the available computation resources without any further actions needed by the programmer. Adopting a well-known and commonly used API facilitates a fast learning curve and simplifies parallelizing existing synchronous code. The reactive API uses the infrastructure provided by the low-level API. Therefore, the same programming model applies.
+The runtime system further offers a reactive API~\cite{Meijer2012}. It is inspired by the commonly used underscore~\cite{underscorejs} and lodash~\cite{lodash} libraries and motivates the programmer to define the computations as operations on data-streams. The runtime system takes care of splitting the work into several sub-tasks and aggregating the sub-results into the end-result. The created tasks perform all operations on a subset of the input values and are potentially executed concurrently. The goal of this API is to provide a well-known and understood API that uses the available computation resources without any further actions needed by the programmer. Adopting a well-known and commonly used API facilitates a fast learning curve and simplifies parallelizing existing synchronous code. The reactive API uses the infrastructure provided by the low-level API. Therefore, the same programming model applies.
 
 
- An implementation of the Mandelbrot computation using the reactive API of Parallel.es is shown in \cref{code:mandelbrot-parallel.es}. The implementation differs only slightly from the synchronous implementation using lodash~\cite{lodash} shown in \cref{fig:mandelbrot-sync}. The \javascriptinline/range/ method (line \ref{code:parallel-es-definition-start}) defines the data stream to process. It creates a data stream containing the values from 0 up to the image height. The input stream is transformed by mapping (\javascriptinline/map/ on line \ref{code:parallel-es-map}) each element from the input stream to an output element that is computed by the \javascriptinline/computeMandelbrotLine/ function (line \ref{code:parallel-es-operation}). The \javascriptinline/computeMandelbrotLine/ function --- that is executed in a background thread --- has access to the current array element and as well to the \javascriptinline/environment/ object that is specified using the \javascriptinline/inEnvironment/ method (line \ref{code:parallel-es-in-environment}). The computation is started using the \javascriptinline/then/ method (line \ref{code:parallel-es-start}) that registers a callback. This callback is invoked in the main thread if the computation succeeds — an optional error callback can be defined as well.
+ An implementation of the Mandelbrot computation using the reactive API of Parallel.es is shown in \cref{code:mandelbrot-parallel.es}. The parallel implementation differs only slightly from the synchronous, lodash~\cite{lodash} based implementation shown in \cref{fig:mandelbrot-sync}. This alikeness of the APIs facilitates a fast learning curve and simplifies transitioning existing code. The \javascriptinline/range/ method (line \ref{code:parallel-es-definition-start}) defines the data-stream to process. It creates a data-stream containing the values from 0 up to the image height. The input stream is transformed by mapping (\javascriptinline/map/ on line \ref{code:parallel-es-map}) each element from the input stream to an output element that is computed by the \javascriptinline/computeMandelbrotLine/ function (line \ref{code:parallel-es-operation}). The \javascriptinline/computeMandelbrotLine/ function --- that is executed in a background thread --- has access to the current array element and the read-only variables from the outer scope. It can further make use of the \javascriptinline/computePixel/ (line \ref{code:mandelbrot-compute-pixel}) function defined in the outer scope or functions imported from other modules. The computation is started using the \javascriptinline/then/ method (line \ref{code:parallel-es-start}) that registers a callback. The \javascriptinline/then/ callback is executed in the main thread and is invoked with a single array containing the joined lines of the Mandelbrot if the computation succeeds. An optional error callback can be defined as well that is invoked incase the execution failed. The API further allows to retrieve sub-results by registering a callback that is invoked whenever the computation of a task has completed by using \javascriptinline/subscribe/ (line \ref{code:parallel-es-subscribe}). The \javascriptinline/subscribe/ callback is invoked in the task completion order and not sequentially. The sub-results can be used to already show the user the up to now computed result. 
  
 \begin{listing}
-	\begin{javascriptcode*}{highlightlines={2, 8-12}}
-function computeMandelbrotLine(y, environment) { |$\label{code:parallel-es-operation}$|
-	const arrazSize = environment.imageWidth * 4;
-	const line = new Uint8ClampedArray(arraySize);
-	// compute...
+	\begin{javascriptcode*}{highlightlines={9, 17-21}}
+const imageWidth = 10000;
+const imageHeight = 10000;
+
+function computePixel(x, y) { |$\label{code:mandelbrot-compute-pixel}$|
+	// ...
+	return n;
+}
+
+function computeMandelbrotLine(y) { |$\label{code:parallel-es-operation}$|
+	const line = new Uint8ClampedArray(imageWidth * 4); |$\label{code:mandelbrot-reference1-imageWidth}$|
+	for (let x = 0; x < imageWidth; ++x) {
+		line[x * 4] = computePixel(x, y);
+	}
 	return line;
 }
 
-parallel      |$\label{code:parallel-es-definition-start}$|
-	.range(options.imageHeight)
-	.inEnvironment(options) |$\label{code:parallel-es-in-environment}$|
-	.map(computeMandelbrotLine) |$\label{code:parallel-es-map}$|
-	.then(result => console.log(result); |$\label{code:parallel-es-start}$|
+parallel
+	.range(imageHeight) |$\label{code:parallel-es-definition-start}$|
+	.map(computeMandelbrotLine)	 |$\label{code:parallel-es-map}$|
+	.subscribe(((subResult, index, batchSize)) => ...) |$\label{code:parallel-es-subscribe}$|
+	.then(result => console.log(result)); |$\label{code:parallel-es-start}$|
 	\end{javascriptcode*}
 	
 	\caption{Mandelbrot Implementation in Parallel.es}
@@ -60,16 +69,25 @@ parallel      |$\label{code:parallel-es-definition-start}$|
 \begin{listing}
 	
 	\begin{javascriptcode}
-function computeMandelbrotLine(y, options) {
-	const arraySize = options.imageWidth * 4;
-	const line = new Uint8ClampedArray(arraySize);
-	// compute...
+const imageWidth = 10000;
+const imageHeight = 10000;
+
+function computePixel(x, y) {
+	// ...
+	return n;
+}
+
+function computeMandelbrotLine(y) {
+	const line = new Uint8ClampedArray(imageWidth * 4);
+	for (let x = 0; x < imageWidth; ++x) {
+		line[x * 4] = computePixel(x, y);
+	}
 	return line;
 }
 
 const result = _.chain()
-	.range(options.imageHeight)
-	.map(y => computeMandelbrotLine(y, options))
+	.range(imageHeight)
+	.map(computeMandelbrotLine)
 	.value();
 	
 console.log(result);

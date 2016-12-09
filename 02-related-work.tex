@@ -4,7 +4,7 @@ There exist various open source projects addressing similar or equal goals. This
 \subsection{Hamsters.js}
 Hamsters.js~\cite{hamstersjs} is the library with the highest attention measured by the number of GitHub stars. It provides a low-level API for running functions in a background thread and uses a global thread pool to manage the created background threads. It supports transferable objects and provides various helper functionalities like array sorting, aggregating, or caching.
 
-The main difference to Hamsters.js is that the API of the proposed work is type-safe and also offers a high-level API that simplifies parallelization. Hamsters.js further has the limitation that no functionalities of external libraries can be exposed in the backgorund threads.
+The main difference to Hamsters.js is that the API of the proposed work is type-safe and better integrates into existing program code. Hamsters.js further has the limitation that no functionalities of external libraries can be exposed in the backgorund threads.
 
 \subsection{Parallel.js}
 Parallel.js~\cite{SavitzkyMayr2016} has been initiated in 2013 and is the oldest of the evaluated libraries. Its main goal is to provide a simple API for multiprocessing in JavaScript. It provides a uniform API for the browser and NodeJS --- web workers are used in the browser, child processes~\cite{childProcess} on NodeJS. Parallel.js provides a low-level API for running a function in a background thread and a reactive API providing automatic work partitioning and result joining. 

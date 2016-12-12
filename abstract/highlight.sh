@@ -1,0 +1,1 @@
+pygmentize -l javascript -o mandelbrot-code.jpg -O "font_name=MONACO,font_size=100,line_number_pad=30,image_pad=30,style=vs" mandelbrot.js

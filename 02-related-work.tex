@@ -1,16 +1,15 @@
 \section{Related Work}\label{sec:related-work}
-There exist various open source projects addressing similar or equal goals. This section describes the differences in the presented work to the already existing ones. The presented work has two characteristics that none of the related work has: Firstly, it offers the same debugging functionalities as developers are used to when working with synchronous code and secondly, it allows code run in background threads to access read-only variable and functions from the main thread.
+There exist various open source projects addressing similar or equal goals. This section describes the differences in the presented work to the already existing ones. The presented work has two characteristics that none of the related work has: Firstly, it offers the same debugging functionalities as developers are used to when working with synchronous code and secondly, it allows code run in background threads to access functions and read-only variables from in the main thread.
 
 \subsection{Hamsters.js}
 Hamsters.js~\cite{hamstersjs} is the library with the highest attention measured by the number of GitHub stars. It provides a low-level API for running functions in a background thread and uses a global thread pool to manage the created background threads. It supports transferable objects and provides various helper functionalities like array sorting, aggregating, or caching.
 
-The main difference to Hamsters.js is that the API of the proposed work is type-safe and integrates seamlessly into existing program code. Hamsters.js further has the limitation that functionalities of external libraries can not be exposed to the background threads.
+The main difference to Hamsters.js is that the API of the proposed work is type-safe and integrates seamlessly into existing program code. Hamsters.js further has the limitation that functionalities of external libraries can not be used in a background thread.
 
 \subsection{Parallel.js}
-Parallel.js~\cite{SavitzkyMayr2016} has been initiated in 2013 and is the oldest of the evaluated libraries. Its main goal is to provide a simple and platform-independent API for multiprocessing in JavaScript. Parallel.js provides a low-level API for running a function in a background thread, and a reactive API providing automatic work partitioning and result joining. 
+Parallel.js~\cite{SavitzkyMayr2016} has been initiated in 2013 and is the oldest of the evaluated libraries. Its main goal is to provide a simple and platform-independent API for multi-core processing in JavaScript. Parallel.js provides a low-level API for running a function in a background thread, and a reactive API providing automatic work partitioning and result joining. 
 
-Parallel.js and the presented work differ in three points:
-Firstly, Parallel.js does not use a thread pool and therefore, can not reuse background threads across operations, e.g. map or filter. Secondly, Parallel.js awaits the sub-results of the proceeding operation before continuing with the next operation if operations are chained together, e.g. the reduce step summing up the values of a filtered array waits until all background threads have completed filtering before starting with summing up the values. Thirdly, the sub-results of an operation are transmitted back to the main thread before starting the next operation on new background threads. This results in unneeded --- and potentially very expensive --- copying of intermediate results from and to background threads.
+Parallel.js and the presented work differ in three points: Firstly, Parallel.js does not use a thread pool and therefore, can not reuse background threads across operations, e.g. map or filter. Secondly, Parallel.js awaits the sub-results of the proceeding operation before continuing with the next operation if operations are chained together, e.g. the reduce step summing up the values of a filtered array waits until all background threads have completed filtering before starting with summing up the values. Thirdly, the sub-results of an operation are transmitted back to the main thread before starting the next operation on new background threads resulting in the unneeded --- and potentially very expensive --- copying of intermediate results from and to background threads.
 
 
 \begin{remark}
@@ -18,4 +17,4 @@ The latest published version on npm\footnote{NPM is a package manager for JavaSc
 \end{remark}
 
 \subsection{Threads.js}
-Thread.js~\cite{Wermke2016} aims to be a simple to use and powerful multithreading library for NodeJS and the browser. The main difference of Threads.js is its messaging-based programming model that is closer to the programming model used by the underlying technologies. Therefore, bridging the programming model gap is left to the programmer.
+Thread.js~\cite{Wermke2016} aims to be a simple to use and powerful multithreading library for NodeJS and the browser. The main difference of Threads.js is its messaging-based programming model that is closer to the programming model used by the underlying standards. Therefore, bridging the programming model gap is left to the programmer.
